@@ -4,7 +4,6 @@ from codec_bpe import Trainer, UNICODE_OFFSET
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--codes_path", type=str, required=True)
-    parser.add_argument("--save_path", type=str, required=True)
     parser.add_argument("--num_codebooks", type=int, required=True)
     parser.add_argument("--codebook_size", type=int, required=True)
     parser.add_argument("--codec_framerate", type=int, required=True)
@@ -15,6 +14,7 @@ if __name__ == "__main__":
     parser.add_argument("--unk_token", type=str, default=None)
     parser.add_argument("--max_token_codebook_ngrams", type=int, default=None)
     parser.add_argument("--unicode_offset", type=int, default=UNICODE_OFFSET)
+    parser.add_argument("--save_path", type=str, default="output/tokenizer.json")
     parser.add_argument("--num_files", type=int, default=None)
     args = parser.parse_args()
 

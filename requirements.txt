@@ -1,4 +1,4 @@
 numpy
-tokenizers
+tokenizers>=0.19.1
 torch
 transformers

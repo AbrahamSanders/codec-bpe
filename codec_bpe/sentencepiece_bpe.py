@@ -13,7 +13,7 @@ class SentencePieceBPETokenizer(BaseTokenizer):
     
     ------------------------------------------------------------------------------------------------
     Adapted from:
-    https://github.com/huggingface/tokenizers/blob/v0.15.2/bindings/python/py_src/tokenizers/implementations/sentencepiece_bpe.py
+    https://github.com/huggingface/tokenizers/blob/v0.19.1/bindings/python/py_src/tokenizers/implementations/sentencepiece_bpe.py
 
     Changes:
     (1) Removed NFKC Unicode normalization: We're using unicode characters as a base alphabet and their content is arbitrary
@@ -40,8 +40,9 @@ class SentencePieceBPETokenizer(BaseTokenizer):
         if tokenizer.token_to_id(str(unk_token)) is not None:
             tokenizer.add_special_tokens([str(unk_token)])
 
-        tokenizer.pre_tokenizer = pre_tokenizers.Metaspace(replacement=replacement, add_prefix_space=add_prefix_space)
-        tokenizer.decoder = decoders.Metaspace(replacement=replacement, add_prefix_space=add_prefix_space)
+        prepend_scheme = "always" if add_prefix_space else "never"
+        tokenizer.pre_tokenizer = pre_tokenizers.Metaspace(replacement=replacement, prepend_scheme=prepend_scheme)
+        tokenizer.decoder = decoders.Metaspace(replacement=replacement, prepend_scheme=prepend_scheme)
 
         parameters = {
             "model": "SentencePieceBPE",

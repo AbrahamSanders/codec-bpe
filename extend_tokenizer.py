@@ -1,13 +1,12 @@
 import argparse
-from tokenizers import Tokenizer
 from transformers import AutoTokenizer
 
-from codec_bpe import extend_transformers_tokenizer
+from codec_bpe import extend_existing_tokenizer
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Extend an existing Transformers tokenizer with codec BPE tokens")
-    parser.add_argument("--transformers_tokenizer", type=str, required=True)
-    parser.add_argument("--codec_bpe_tokenizer", type=str, default="output/tokenizer.json")
+    parser.add_argument("--existing_tokenizer", type=str, required=True)
+    parser.add_argument("--codec_bpe_tokenizer", type=str, required=True)
     parser.add_argument("--audio_start_token", type=str)
     parser.add_argument("--audio_end_token", type=str)
     parser.add_argument("--use_special_token_format", action="store_true")
@@ -15,17 +14,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.save_path is None:
-        args.save_path = f"output/{args.transformers_tokenizer}_extended"
+        args.save_path = f"output/{args.existing_tokenizer}_extended"
 
-    transformers_tokenizer = AutoTokenizer.from_pretrained(args.transformers_tokenizer)
-    codec_bpe_tokenizer = Tokenizer.from_file(args.codec_bpe_tokenizer)
+    existing_tokenizer = AutoTokenizer.from_pretrained(args.existing_tokenizer)
+    codec_bpe_tokenizer = AutoTokenizer.from_pretrained(args.codec_bpe_tokenizer)
 
-    num_added = extend_transformers_tokenizer(
-        transformers_tokenizer,
+    num_added = extend_existing_tokenizer(
+        existing_tokenizer,
         codec_bpe_tokenizer,
         args.audio_start_token,
         args.audio_end_token,
         args.use_special_token_format,
     )
-    print(f"Added {num_added} tokens to the transformers tokenizer.")
-    transformers_tokenizer.save_pretrained(args.save_path)
+    print(f"Added {num_added} tokens to the existing tokenizer {args.existing_tokenizer} and saved it as {args.save_path}.")
+    existing_tokenizer.save_pretrained(args.save_path)

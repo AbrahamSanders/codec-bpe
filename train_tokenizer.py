@@ -1,5 +1,4 @@
 import argparse
-import os
 from codec_bpe import Trainer, UNICODE_OFFSET
 
 if __name__ == "__main__":
@@ -15,9 +14,12 @@ if __name__ == "__main__":
     parser.add_argument("--unk_token", type=str, default=None)
     parser.add_argument("--max_token_codebook_ngrams", type=int, default=None)
     parser.add_argument("--unicode_offset", type=int, default=UNICODE_OFFSET)
-    parser.add_argument("--save_path", type=str, default="output/tokenizer.json")
+    parser.add_argument("--save_path", type=str)
     parser.add_argument("--num_files", type=int, default=None)
     args = parser.parse_args()
+
+    if args.save_path is None:
+        args.save_path = f"output/codec_bpe_{args.num_codebooks}cb_{round(args.vocab_size/1000)}k"
 
     trainer = Trainer(
         args.num_codebooks,
@@ -32,7 +34,4 @@ if __name__ == "__main__":
         args.unicode_offset,
     )
     tokenizer = trainer.train(args.codes_path, args.num_files)
-    save_dir = os.path.dirname(args.save_path)
-    if save_dir:
-        os.makedirs(save_dir, exist_ok=True)
-    tokenizer.save(args.save_path)
+    tokenizer.save_pretrained(args.save_path)

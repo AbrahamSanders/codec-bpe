@@ -78,7 +78,7 @@ You may want to train a new codec BPE tokenizer and then export its trained voca
 Suppose you have trained your codec BPE tokenizer and saved it to `output/tokenizer.json` and you want to extend the Mistral-7B-v0.1 tokenizer with its vocabulary, run:
 ```bash
 python extend_tokenizer.py \
-    --transformers_tokenizer mistralai/Mistral-7B-v0.1 \
+    --existing_tokenizer mistralai/Mistral-7B-v0.1 \
     --codec_bpe_tokenizer output/tokenizer.json \
     --audio_start_token <audio> \ # optional
     --audio_end_token </audio>    # optional
@@ -93,7 +93,7 @@ If the added codec BPE unicode tokens would conflict with existing tokens in the
 2. Use the `use_special_token_format` argument for `extend_tokenizer.py`. This wraps each unicode character in each ngram with <>. For example, the 4-gram token "一刁嘂娃" would be converted to a token containing the string "\<一>\<刁>\<嘂>\<娃>". This format is more verbose, but should virtually eliminate the possibility of a vocabulary conflict:
     ```bash
     python extend_tokenizer.py \
-        --transformers_tokenizer mistralai/Mistral-7B-v0.1 \
+        --existing_tokenizer mistralai/Mistral-7B-v0.1 \
         --codec_bpe_tokenizer output/tokenizer.json \
         --audio_start_token <audio> \ # optional
         --audio_end_token </audio> \  # optional

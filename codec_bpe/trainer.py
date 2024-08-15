@@ -2,6 +2,7 @@ from typing import Optional, List, Union, Iterator
 
 import numpy as np
 from tokenizers import AddedToken
+from transformers import PreTrainedTokenizerFast
 
 from .sentencepiece_bpe import SentencePieceBPETokenizer
 from .converter import codes_to_chars, UNICODE_OFFSET
@@ -97,5 +98,6 @@ class Trainer:
             initial_alphabet=initial_alphabet,
             max_token_length=max_token_length,
         )
+        tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer, clean_up_tokenization_spaces=False)
         return tokenizer
     

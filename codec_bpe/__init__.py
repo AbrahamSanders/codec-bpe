@@ -3,7 +3,7 @@ from .converter import (
     chars_to_codes,
     UNICODE_OFFSET,
 )
-from .extender import extend_transformers_tokenizer
+from .extender import extend_existing_tokenizer
 from .trainer import Trainer
 from .lm_dataset_builder import LMDatasetBuilder
 from .sentencepiece_bpe import SentencePieceBPETokenizer

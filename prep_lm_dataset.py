@@ -1,7 +1,7 @@
 import argparse
 import os
 from tqdm import tqdm
-from transformers import AutoTokenizer, PreTrainedTokenizerFast
+from transformers import AutoTokenizer
 
 from codec_bpe import LMDatasetBuilder, UNICODE_OFFSET
 
@@ -24,10 +24,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_examples", type=int, default=None)
     args = parser.parse_args()
 
-    if args.tokenizer.endswith(".json"):
-        tokenizer = PreTrainedTokenizerFast(tokenizer_file=args.tokenizer)
-    else:
-        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
 
     lm_dataset_builder = LMDatasetBuilder(
         tokenizer=tokenizer,

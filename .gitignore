@@ -164,3 +164,5 @@ cython_debug/
 # VSCode
 .vscode/
 output/
+audio/
+codes/

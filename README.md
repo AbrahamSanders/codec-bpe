@@ -73,27 +73,35 @@ Here:
 See [train_tokenizer.py](train_tokenizer.py) for a complete list of supported arguments.
 
 ### Extend an existing Transformers PreTrainedTokenizer
-You may want to train a new codec BPE tokenizer and then export its trained vocabulary to an existing tokenizer. For example, extending the Llama3, Mistral, Qwen, etc. tokenizers for multimodal text-audio language modeling.
+You may want to train a new codec BPE tokenizer and then export its trained vocabulary to an existing Transformers tokenizer. For example, extending the Llama3, Mistral, Qwen, etc. tokenizers for multimodal text-audio language modeling.
 
 Suppose you have trained your codec BPE tokenizer and saved it to `output/tokenizer.json` and you want to extend the Mistral-7B-v0.1 tokenizer with its vocabulary, run:
 ```bash
 python extend_tokenizer.py \
     --transformers_tokenizer mistralai/Mistral-7B-v0.1 \
-    --codec_bpe_tokenizer output/tokenizer.json
+    --codec_bpe_tokenizer output/tokenizer.json \
+    --audio_start_token <audio> \ # optional
+    --audio_end_token </audio>    # optional
 ```
-This will simply add every token in `output/tokenizer.json` to `mistralai/Mistral-7B-v0.1` as a special token and save a copy of the latter. 
+This will simply add every token in `output/tokenizer.json` to the `mistralai/Mistral-7B-v0.1` tokenizer as a special token and save a copy of the latter. 
 
 #### Avoiding vocabulary conflicts
 If the added codec BPE unicode tokens would conflict with existing tokens in the vocabulary, there are two options to mitigate this:
 
 1. Override the default unicode offset using the `unicode_offset` argument for both `train_tokenizer.py` and `extend_tokenizer.py`. By default, unicode characters from the [CJK Unified Ideographs](https://symbl.cc/en/unicode-table/#cjk-unified-ideographs) block are used, following the Acoustic BPE paper. You can set `unicode_offset` to a different value to use a different unicode block that doesn't conflict with your existing vocabulary.
 
-2. Use the `use_special_code_format` argument for `extend_tokenizer.py`. This converts each token from ngrams of unicode characters to custom "special token" strings of the format \<c0t0000> (codebook 0, code 0000). For example, given the default unicode offset, the 4-gram token "一刁嘂娃" would be converted to a token containing the string "\<c0t0000>\<c1t0001>\<c2t0002>\<c3t0003>". This format is quite verbose, but should virtually eliminate the possibility of a vocabulary conflict. When using this flag, the `num_codebooks` and `codebook_size` arguments must also be supplied so that the appropriate conversion can take place:
+2. Use the `use_special_token_format` argument for `extend_tokenizer.py`. This wraps each unicode character in each ngram with <>. For example, the 4-gram token "一刁嘂娃" would be converted to a token containing the string "\<一>\<刁>\<嘂>\<娃>". This format is more verbose, but should virtually eliminate the possibility of a vocabulary conflict:
     ```bash
     python extend_tokenizer.py \
         --transformers_tokenizer mistralai/Mistral-7B-v0.1 \
         --codec_bpe_tokenizer output/tokenizer.json \
-        --num_codebooks 4 \
-        --codebook_size 1024 \
-        --use_special_code_format
+        --audio_start_token <audio> \ # optional
+        --audio_end_token </audio> \  # optional
+        --use_special_token_format
     ```
+    Then when preparing audio for tokenization with the extended tokenizer, you can pass the same argument to the `codes_to_chars` function:
+    ```python
+    # convert codes to unicode string
+    unicode_str = codes_to_chars(encoded_audio, codebook_size=model.codebook_size, use_special_token_format=True)
+    ```
+    It is unnecessary to pass this argument to `chars_to_codes` - it will automatically detect and remove the special token format before converting back to codes.

@@ -1,19 +1,19 @@
 from typing import Optional, List, Union, Iterator
 
-import os
 import numpy as np
 from tokenizers import AddedToken
 
 from .sentencepiece_bpe import SentencePieceBPETokenizer
 from .converter import codes_to_chars, UNICODE_OFFSET
+from .utils import get_codes_files
 
 class Trainer:
     def __init__(
         self, 
         num_codebooks: int,
         codebook_size: int,
-        codec_framerate: int,
-        chunk_size_secs: int = 30,
+        codec_framerate: Optional[int] = None,
+        chunk_size_secs: Optional[int] = None,
         vocab_size: int = 30000,
         min_frequency: int = 2,
         special_tokens: Optional[List[Union[str, AddedToken]]] = None,
@@ -21,6 +21,12 @@ class Trainer:
         max_token_codebook_ngrams: Optional[int] = None,
         unicode_offset: int = UNICODE_OFFSET,
     ):
+        if chunk_size_secs is not None:
+            if codec_framerate is None:
+                raise ValueError("If chunk_size_secs is set, codec_framerate must also be set.")
+            if chunk_size_secs < 1:
+                raise ValueError("chunk_size_secs must be a positive integer >= 1.")
+
         self.num_codebooks = num_codebooks
         self.codebook_size = codebook_size
         self.codec_framerate = codec_framerate
@@ -37,13 +43,6 @@ class Trainer:
         if self.unk_token is not None and self.unk_token not in self.special_tokens:
             self.special_tokens.insert(0, self.unk_token)
 
-    def _get_codes_files(self, codes_path: str) -> List[str]:
-        codes_files = []
-        for root, _, files in os.walk(codes_path):
-            codes_files.extend([os.path.join(root, file) for file in files if file.endswith(".npy")])
-        codes_files.sort()
-        return codes_files
-
     def _iterate_and_convert(self, codes_files: List[str]) -> Iterator[str]:
         for codes_file in codes_files:
             codes = np.load(codes_file)
@@ -52,19 +51,19 @@ class Trainer:
             elif len(codes.shape) == 3:
                 codes = codes[0]
             codes = codes[:self.num_codebooks]
-            chunk_size = self.chunk_size_secs * self.codec_framerate
+            chunk_size = self.chunk_size_secs * self.codec_framerate if self.chunk_size_secs else codes.shape[1]
             for i in range(0, codes.shape[1], chunk_size):
                 chars = codes_to_chars(
                     codes[:, i:i+chunk_size], 
                     self.codebook_size, 
-                    self.unicode_offset,
+                    copy_before_conversion=False,
+                    unicode_offset=self.unicode_offset
                 )
                 yield chars
 
     def train(
-        self, 
-        codes_path: str, 
-        save_path: str, 
+        self,
+        codes_path: str,
         num_files: Optional[int] = None,
     ) -> SentencePieceBPETokenizer:
         # Compute base alphabet. This should be num_codebooks * codebook_size so that we never split a codeword
@@ -85,9 +84,7 @@ class Trainer:
             max_token_length = self.max_token_codebook_ngrams * self.num_codebooks
 
         # Train tokenizer
-        codes_files = self._get_codes_files(codes_path)
-        if num_files is not None:
-            codes_files = codes_files[:num_files]
+        codes_files = get_codes_files(codes_path, num_files)
         codes_iterator = self._iterate_and_convert(codes_files)
                 
         tokenizer = SentencePieceBPETokenizer(unk_token=self.unk_token, add_prefix_space=False)
@@ -100,6 +97,5 @@ class Trainer:
             initial_alphabet=initial_alphabet,
             max_token_length=max_token_length,
         )
-        tokenizer.save(save_path)
         return tokenizer
     

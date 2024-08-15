@@ -5,4 +5,5 @@ from .converter import (
 )
 from .extender import extend_transformers_tokenizer
 from .trainer import Trainer
+from .lm_dataset_builder import LMDatasetBuilder
 from .sentencepiece_bpe import SentencePieceBPETokenizer

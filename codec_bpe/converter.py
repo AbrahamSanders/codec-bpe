@@ -2,9 +2,11 @@
 Converter utility for converting discrete codec codes to and from unicode characters used for BPE tokenization.
 """
 from typing import List, Optional, Union
+import logging
 import numpy as np
 import torch
 
+logger = logging.getLogger(__name__)
 UNICODE_OFFSET: int = 0x4E00
 
 def codes_to_chars(
@@ -36,12 +38,18 @@ def chars_to_codes(
     chars: str, 
     num_codebooks: int,
     codebook_size: int,
+    drop_inconsistent_codes: bool = True,
+    drop_hanging_codes: bool = True,
     return_tensors: Optional[str] = None, 
     unicode_offset: int = UNICODE_OFFSET,
 ) -> Union[List[List[int]], np.ndarray, torch.Tensor]:
     if chars[0] == "<":
         chars = chars.replace("<", "").replace(">", "")
     codes = np.array([ord(c) for c in chars])
+    if drop_inconsistent_codes:
+        codes = _drop_inconsistent_codes(codes, num_codebooks, codebook_size, unicode_offset)
+    if drop_hanging_codes:
+        codes = _drop_hanging_codes(codes, num_codebooks, codebook_size, unicode_offset)
     codes = codes.reshape(-1, num_codebooks).T
     for i in range(codes.shape[0]):
         codes[i] -= unicode_offset + i*codebook_size
@@ -50,4 +58,59 @@ def chars_to_codes(
     elif return_tensors == "pt":
         codes = torch.tensor(codes)
     return codes
+
+def _resolve_codebook(code: int, num_codebooks: int, codebook_size: int, unicode_offset: int) -> int:
+    codebook = num_codebooks-1
+    while codebook > -1 and code < unicode_offset + codebook*codebook_size:
+        codebook -= 1
+    return codebook
+
+def _drop_inconsistent_codes(
+    codes: np.ndarray, 
+    num_codebooks: int,
+    codebook_size: int,
+    unicode_offset: int,
+) -> np.ndarray:
+    mask = np.ones_like(codes, dtype=bool)
+    expected_codebook = _resolve_codebook(codes[0], num_codebooks, codebook_size, unicode_offset)
+    if expected_codebook < 0:
+        expected_codebook = 0
+    for i in range(len(codes)):
+        # figure out which codebook the character belongs to
+        actual_codebook = _resolve_codebook(codes[i], num_codebooks, codebook_size, unicode_offset)
+        # mark it to be dropped if it doesn't match the expected codebook
+        if actual_codebook != expected_codebook:
+            mask[i] = False
+            logger.warning(
+                f"Dropped inconsistent audio code at position {i}. "
+                f"Expected codebook {expected_codebook} but got codebook {actual_codebook}."
+            )
+        else:
+            expected_codebook = (expected_codebook + 1) % num_codebooks
+    codes = codes[mask]
+    return codes
+
+def _drop_hanging_codes(
+    codes: np.ndarray, 
+    num_codebooks: int,
+    codebook_size: int,
+    unicode_offset: int,
+) -> np.ndarray:
+    # first check for hanging codes at the beginning
+    while len(codes) > 0:
+        actual_codebook = _resolve_codebook(codes[0], num_codebooks, codebook_size, unicode_offset)
+        if actual_codebook == 0:
+            break
+        codes = codes[1:]
+        logger.info(f"Dropped hanging audio code (codebook {actual_codebook}) at beginning of sequence.")
+    # then check for hanging codes at the end
+    while len(codes) > 0:
+        actual_codebook = _resolve_codebook(codes[-1], num_codebooks, codebook_size, unicode_offset)
+        if actual_codebook == num_codebooks-1:
+            break
+        codes = codes[:-1]
+        logger.info(f"Dropped hanging audio code (codebook {actual_codebook}) at end of sequence.")
+    return codes
+
+
     

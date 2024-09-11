@@ -51,8 +51,8 @@ class LMDatasetBuilder:
             grouped_codes_files[-1].append(codes_file)
         return grouped_codes_files
 
-    def iterate_examples(self, codes_path: str) -> Iterator[str]:
-        codes_files = get_codes_files(codes_path)
+    def iterate_examples(self, codes_path: str, codes_filter: Optional[Union[str, List[str]]] = None) -> Iterator[str]:
+        codes_files = get_codes_files(codes_path, codes_filter)
         # group codes files by root filename (minus channel and starting timestamp)
         grouped_codes_files = self._group_codes_files(codes_files)
         for file_group in tqdm(grouped_codes_files, desc="Codes file groups"):

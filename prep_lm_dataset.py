@@ -21,6 +21,7 @@ if __name__ == "__main__":
     parser.add_argument("--overlap_length", type=int, default=1024)
     parser.add_argument("--drop_last", action="store_true")
     parser.add_argument("--save_path", type=str, default="output/lm_dataset.txt")
+    parser.add_argument("--codes_filter", type=str, nargs="+")
     parser.add_argument("--num_examples", type=int, default=None)
     args = parser.parse_args()
 
@@ -44,7 +45,7 @@ if __name__ == "__main__":
         os.makedirs(save_dir, exist_ok=True)
 
     with open(args.save_path, "w", encoding="utf-8") as f:
-        for i, example in tqdm(enumerate(lm_dataset_builder.iterate_examples(args.codes_path)), desc="Examples"):
+        for i, example in tqdm(enumerate(lm_dataset_builder.iterate_examples(args.codes_path, args.codes_filter)), desc="Examples"):
             if i == args.num_examples:
                 break
             f.write(example)

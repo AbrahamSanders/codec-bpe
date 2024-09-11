@@ -15,6 +15,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_token_codebook_ngrams", type=int, default=None)
     parser.add_argument("--unicode_offset", type=int, default=UNICODE_OFFSET)
     parser.add_argument("--save_path", type=str)
+    parser.add_argument("--codes_filter", type=str, nargs="+")
     parser.add_argument("--num_files", type=int, default=None)
     args = parser.parse_args()
 
@@ -33,5 +34,5 @@ if __name__ == "__main__":
         args.max_token_codebook_ngrams,
         args.unicode_offset,
     )
-    tokenizer = trainer.train(args.codes_path, args.num_files)
+    tokenizer = trainer.train(args.codes_path, args.codes_filter, args.num_files)
     tokenizer.save_pretrained(args.save_path)

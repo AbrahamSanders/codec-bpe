@@ -65,6 +65,7 @@ class Trainer:
     def train(
         self,
         codes_path: str,
+        codes_filter: Optional[Union[str, List[str]]] = None, 
         num_files: Optional[int] = None,
     ) -> SentencePieceBPETokenizer:
         # Compute base alphabet. This should be num_codebooks * codebook_size so that we never split a codeword
@@ -85,7 +86,7 @@ class Trainer:
             max_token_length = self.max_token_codebook_ngrams * self.num_codebooks
 
         # Train tokenizer
-        codes_files = get_codes_files(codes_path, num_files)
+        codes_files = get_codes_files(codes_path, codes_filter, num_files)
         codes_iterator = self._iterate_and_convert(codes_files)
                 
         tokenizer = SentencePieceBPETokenizer(unk_token=self.unk_token, add_prefix_space=False)

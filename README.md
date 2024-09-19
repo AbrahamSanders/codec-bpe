@@ -28,8 +28,8 @@ from codec_bpe import codes_to_chars, chars_to_codes
 
 # load a codec BPE tokenizer and compatible language model
 device = "cuda" if torch.cuda.is_available() else "cpu"
-tokenizer = AutoTokenizer.from_pretrained("output/your_tokenizer")
-model = AutoModelForCausalLM.from_pretrained("output/your_model").to(device)
+tokenizer = AutoTokenizer.from_pretrained("output/my_tokenizer")
+model = AutoModelForCausalLM.from_pretrained("output/my_model").to(device)
 
 # load the EnCodec model
 encodec_modelname = "facebook/encodec_24khz"
@@ -61,7 +61,7 @@ encoded_audio_2 = chars_to_codes(
 # (5) decode the generated audio using EnCodec
 with torch.no_grad():
     audio_2 = encodec_model.decode(encoded_audio_2.unsqueeze(0).unsqueeze(0), [None]).audio_values[0, 0]
-sf.write("output.wav", audio_2.cpu().numpy(), sr)
+sf.write("some_audio_output.wav", audio_2.cpu().numpy(), sr)
 ```
 
 ### Train a tokenizer from audio files
@@ -72,14 +72,14 @@ To train a tokenizer from audio files:
     # encode audio files using EnCodec 24 kHz at 3 kbps (4 codebooks)
     python -m codec_bpe.audio_to_codes \
         --audio_path path/to/audio \
-        --codes_path path/to/codes/encodec_24khz \
+        --codes_path output/codes/encodec_24khz \
         --encodec_model facebook/encodec_24khz \
         --bandwidth 3.0
 
     # encode audio files using first 4 codebooks of DAC 44kHz
     python -m codec_bpe.audio_to_codes \
         --audio_path path/to/audio \
-        --codes_path path/to/codes/dac_44khz \
+        --codes_path output/codes/dac_44khz \
         --dac_model 44khz \
         --n_quantizers 4 \
         --use_dac
@@ -88,14 +88,14 @@ To train a tokenizer from audio files:
 2. Suppose you want to use the first 4 codebooks of [EnCodec 24 kHz](https://huggingface.co/facebook/encodec_24khz), run:
     ```bash
     python -m codec_bpe.train_tokenizer \
-        --codes_path path/to/codes/encodec_24khz \
+        --codes_path output/codes/encodec_24khz \
         --num_codebooks 4 \
         --codebook_size 1024 \
         --codec_framerate 75 \
         --chunk_size_secs 30 \
         --vocab_size 30000 \
         --pad_token <pad> \
-        --save_path output/tokenizer.json
+        --save_path output/my_tokenizer
     ```
     Here: 
     - `num_codebooks` specifies how many codebooks should be used (in a flattened pattern) when converting each timestep to unicode. For example, EnCodec 24kHz uses 2 codebooks at 1.5 kbps, 4 codebooks at 3 kbps, 8 codebooks at 6 kbps, etc. Note: when encoding the audio files, you should use at least as many codebooks as you plan to specify here.
@@ -113,7 +113,7 @@ Suppose you have trained your codec BPE tokenizer and saved it to `output/tokeni
 ```bash
 python -m codec_bpe.extend_tokenizer \
     --existing_tokenizer mistralai/Mistral-7B-v0.1 \
-    --codec_bpe_tokenizer output/tokenizer.json \
+    --codec_bpe_tokenizer output/my_tokenizer \
     --audio_start_token <audio> \ # optional
     --audio_end_token </audio>    # optional
 ```
@@ -128,7 +128,7 @@ If the added codec BPE unicode tokens would conflict with existing tokens in the
     ```bash
     python -m codec_bpe.extend_tokenizer \
         --existing_tokenizer mistralai/Mistral-7B-v0.1 \
-        --codec_bpe_tokenizer output/tokenizer.json \
+        --codec_bpe_tokenizer output/my_tokenizer \
         --audio_start_token <audio> \ # optional
         --audio_end_token </audio> \  # optional
         --use_special_token_format

@@ -18,7 +18,10 @@ class Trainer:
         vocab_size: int = 30000,
         min_frequency: int = 2,
         special_tokens: Optional[List[Union[str, AddedToken]]] = None,
+        bos_token: Optional[str] = None,
+        eos_token: Optional[str] = None,
         unk_token: Optional[str] = None,
+        pad_token: Optional[str] = None,
         max_token_codebook_ngrams: Optional[int] = None,
         unicode_offset: int = UNICODE_OFFSET,
     ):
@@ -27,6 +30,10 @@ class Trainer:
                 raise ValueError("If chunk_size_secs is set, codec_framerate must also be set.")
             if chunk_size_secs < 1:
                 raise ValueError("chunk_size_secs must be a positive integer >= 1.")
+        if eos_token is None and pad_token is None:
+            raise ValueError(
+                "Either pad_token or eos_token should be set, otherwise padded batching will not work with this tokenizer."
+            )
 
         self.num_codebooks = num_codebooks
         self.codebook_size = codebook_size
@@ -35,14 +42,18 @@ class Trainer:
         self.vocab_size = vocab_size
         self.min_frequency = min_frequency
         self.special_tokens = special_tokens
+        self.bos_token = bos_token
+        self.eos_token = eos_token
         self.unk_token = unk_token
+        self.pad_token = pad_token
         self.max_token_codebook_ngrams = max_token_codebook_ngrams
         self.unicode_offset = unicode_offset
 
         if self.special_tokens is None:
             self.special_tokens = []
-        if self.unk_token is not None and self.unk_token not in self.special_tokens:
-            self.special_tokens.insert(0, self.unk_token)
+        for special_token in [self.eos_token, self.bos_token, self.unk_token, self.pad_token]:
+            if special_token is not None and special_token not in self.special_tokens:
+                self.special_tokens.insert(0, special_token)
 
     def _iterate_and_convert(self, codes_files: List[str]) -> Iterator[str]:
         for codes_file in codes_files:
@@ -99,6 +110,14 @@ class Trainer:
             initial_alphabet=initial_alphabet,
             max_token_length=max_token_length,
         )
-        tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer, clean_up_tokenization_spaces=False)
+        tokenizer = PreTrainedTokenizerFast(
+            tokenizer_object=tokenizer, 
+            bos_token=self.bos_token,
+            eos_token=self.eos_token,
+            unk_token=self.unk_token,
+            pad_token=self.pad_token,
+            clean_up_tokenization_spaces=False,
+            model_input_names=['input_ids', 'attention_mask'],
+        )
         return tokenizer
     

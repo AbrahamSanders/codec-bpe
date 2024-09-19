@@ -11,7 +11,10 @@ if __name__ == "__main__":
     parser.add_argument("--vocab_size", type=int, default=30000)
     parser.add_argument("--min_frequency", type=int, default=2)
     parser.add_argument("--special_tokens", nargs="+", default=None)
+    parser.add_argument("--bos_token", type=str, default=None)
+    parser.add_argument("--eos_token", type=str, default=None)
     parser.add_argument("--unk_token", type=str, default=None)
+    parser.add_argument("--pad_token", type=str, default=None)
     parser.add_argument("--max_token_codebook_ngrams", type=int, default=None)
     parser.add_argument("--unicode_offset", type=int, default=UNICODE_OFFSET)
     parser.add_argument("--save_path", type=str)
@@ -30,7 +33,10 @@ if __name__ == "__main__":
         args.vocab_size,
         args.min_frequency,
         args.special_tokens,
+        args.bos_token,
+        args.eos_token,
         args.unk_token,
+        args.pad_token,
         args.max_token_codebook_ngrams,
         args.unicode_offset,
     )

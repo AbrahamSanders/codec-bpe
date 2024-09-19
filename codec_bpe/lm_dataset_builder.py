@@ -69,7 +69,7 @@ class LMDatasetBuilder:
                 self.codebook_size, 
                 use_special_token_format=self.use_special_token_format,
                 copy_before_conversion=False,
-                unicode_offset=self.unicode_offset
+                unicode_offset=self.unicode_offset,
             )
             # encode the unicode string with the tokenizer
             tokens = self.tokenizer.encode(chars, return_tensors="np")[0]

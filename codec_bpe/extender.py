@@ -15,9 +15,17 @@ def extend_existing_tokenizer(
     if audio_end_token is not None:
         additional_special_tokens.append(audio_end_token)
     target_tokens = []
+    skip_token_ids = set([
+        codec_bpe_tokenizer.bos_token_id, 
+        codec_bpe_tokenizer.eos_token_id, 
+        codec_bpe_tokenizer.unk_token_id, 
+        codec_bpe_tokenizer.pad_token_id,
+    ])
     for i in trange(len(codec_bpe_tokenizer)):
+        if i in skip_token_ids:
+            continue
         token = codec_bpe_tokenizer.convert_ids_to_tokens(i)
-        if use_special_token_format:
+        if use_special_token_format and i not in codec_bpe_tokenizer.added_tokens_decoder:
             token = "".join([f"<{c}>" for c in token])
         target_tokens.append(token)
 

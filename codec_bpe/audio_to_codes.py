@@ -9,7 +9,7 @@ from tqdm import tqdm
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert audio files to numpy files containing Encodec or DAC codes")
     parser.add_argument("--audio_path", type=str, default="audio", help="Directory containing the audio files")
-    parser.add_argument("--codes_path", type=str, default="codes", help="Directory to save the numpy codes files")
+    parser.add_argument("--codes_path", type=str, default="output/codes", help="Directory to save the numpy codes files")
     parser.add_argument("--chunk_size_secs", type=int, default=60, help="Chunk size in seconds")
     parser.add_argument("--encodec_model", type=str, default="facebook/encodec_24khz", help="Encodec model name. Ignored if --use_dac is set.")
     parser.add_argument("--bandwidth", type=float, default=6.0, help="Bandwidth for encoding. Ignored if --use_dac is set.")

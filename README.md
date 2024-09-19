@@ -72,14 +72,12 @@ To train a tokenizer from audio files:
     # encode audio files using EnCodec 24 kHz at 3 kbps (4 codebooks)
     python -m codec_bpe.audio_to_codes \
         --audio_path path/to/audio \
-        --codes_path output/codes/encodec_24khz \
         --encodec_model facebook/encodec_24khz \
         --bandwidth 3.0
 
     # encode audio files using first 4 codebooks of DAC 44kHz
     python -m codec_bpe.audio_to_codes \
         --audio_path path/to/audio \
-        --codes_path output/codes/dac_44khz \
         --dac_model 44khz \
         --n_quantizers 4 \
         --use_dac
@@ -88,7 +86,7 @@ To train a tokenizer from audio files:
 2. Suppose you want to use the first 4 codebooks of [EnCodec 24 kHz](https://huggingface.co/facebook/encodec_24khz), run:
     ```bash
     python -m codec_bpe.train_tokenizer \
-        --codes_path output/codes/encodec_24khz \
+        --codes_path output/codes/encodec_24khz/mono \
         --num_codebooks 4 \
         --codebook_size 1024 \
         --codec_framerate 75 \

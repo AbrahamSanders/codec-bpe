@@ -1,7 +1,7 @@
 import argparse
 from transformers import AutoTokenizer
 
-from codec_bpe import extend_existing_tokenizer
+from .tools.extender import extend_existing_tokenizer
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Extend an existing Transformers tokenizer with codec BPE tokens")

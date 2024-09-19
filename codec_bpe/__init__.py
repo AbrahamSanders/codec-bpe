@@ -1,9 +1,7 @@
-from .converter import (
+from .core.converter import (
     codes_to_chars, 
     chars_to_codes,
     UNICODE_OFFSET,
 )
-from .extender import extend_existing_tokenizer
-from .trainer import Trainer
-from .lm_dataset_builder import LMDatasetBuilder
-from .sentencepiece_bpe import SentencePieceBPETokenizer
+
+__version__ = "1.0.0"

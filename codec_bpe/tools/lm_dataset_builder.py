@@ -3,8 +3,8 @@ from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 from tqdm import tqdm
 import numpy as np
 
-from .converter import codes_to_chars, UNICODE_OFFSET
-from .utils import get_codes_files
+from ..core.converter import codes_to_chars, UNICODE_OFFSET
+from ..core.utils import get_codes_files
 
 class LMDatasetBuilder:
     def __init__(

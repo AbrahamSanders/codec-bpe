@@ -3,7 +3,8 @@ import os
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
-from codec_bpe import LMDatasetBuilder, UNICODE_OFFSET
+from .tools.lm_dataset_builder import LMDatasetBuilder
+from . import UNICODE_OFFSET
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

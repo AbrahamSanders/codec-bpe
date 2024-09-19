@@ -1,5 +1,7 @@
 import argparse
-from codec_bpe import Trainer, UNICODE_OFFSET
+
+from .core.trainer import Trainer
+from . import UNICODE_OFFSET
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a codec BPE tokenizer from numpy files containing audio codes")

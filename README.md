@@ -34,13 +34,13 @@ with torch.no_grad():
     encoded_audio = model.encode(**inputs, bandwidth=3.0).audio_codes[0, 0]
 
 # convert codes to unicode string
-unicode_str = codes_to_chars(encoded_audio, codebook_size=model.codebook_size)
+unicode_str = codes_to_chars(encoded_audio, codebook_size=model.config.codebook_size)
 
 # restore unicode string to codes tensor
 encoded_audio_2 = chars_to_codes(
     unicode_str, 
     num_codebooks=encoded_audio.shape[0], 
-    codebook_size=model.codebook_size, 
+    codebook_size=model.config.codebook_size, 
     return_tensors="pt"
 )
 
@@ -102,6 +102,6 @@ If the added codec BPE unicode tokens would conflict with existing tokens in the
     Then when preparing audio for tokenization with the extended tokenizer, you can pass the same argument to the `codes_to_chars` function:
     ```python
     # convert codes to unicode string
-    unicode_str = codes_to_chars(encoded_audio, codebook_size=model.codebook_size, use_special_token_format=True)
+    unicode_str = codes_to_chars(encoded_audio, codebook_size=model.config.codebook_size, use_special_token_format=True)
     ```
     It is unnecessary to pass this argument to `chars_to_codes` - it will automatically detect and remove the special token format before converting back to codes.

@@ -1,5 +1,25 @@
 # codec-bpe
-Implementation of [Acoustic BPE](https://arxiv.org/abs/2310.14580) (Shen et al., 2024), extended for RVQ-based Neural Audio Codecs such as [EnCodec](https://github.com/facebookresearch/encodec) (Défossez et al., 2022) or [DAC](https://github.com/descriptinc/descript-audio-codec) (Kumar et al., 2023). Built on top of the [HuggingFace Tokenizers](https://github.com/huggingface/tokenizers) library.
+![codec_bpe.png](img/codec_bpe.png)
+
+Codec BPE is an implementation of [Acoustic BPE](https://arxiv.org/abs/2310.14580) (Shen et al., 2024), extended for RVQ-based Neural Audio Codecs such as [EnCodec](https://github.com/facebookresearch/encodec) (Défossez et al., 2022), [DAC](https://github.com/descriptinc/descript-audio-codec) (Kumar et al., 2023), and [Mimi](https://huggingface.co/kyutai/mimi) (Défossez et al., 2024). Built on top of the [HuggingFace Tokenizers](https://github.com/huggingface/tokenizers) library.
+
+Codec BPE flattens multi-level codes from Residual Vector Quantizers (RVQ) and converts them into unicode strings for tokenization into compressed token sequences. For example, a single Codec BPE token might represent a 4-gram of codes from 4 codebooks representing a single acoustic unit, a 6-gram comprising a whole acoustic unit and half of the next one, or even an 8-gram represnting two whole acoustic units. Depending on the codec, vocab size and type of audio, this can yield savings of 2-5x in sequence length compared to directly modeling the flattened codebooks.
+
+**Using Codec BPE allows efficient audio language modeling with multi-level codecs to be done with vanilla LLM architectures, meaning no custom architecture is needed to deal with modeling the RVQ. Your model will already be compatible with the full ecosystem of training and inference tools available for [HuggingFace Transformers](https://github.com/huggingface/transformers), such as [vLLM](https://github.com/vllm-project/vllm)!**
+
+## 🚀 Updates
+**2024-09-20**
+
+- Added support for Kyutai Lab's [Mimi codec](https://huggingface.co/kyutai/mimi), an amazing new codec with a 12.5 Hz framerate! Simply add `--use_mimi` when encoding audio with `codec_bpe.audio_to_codes` to encode using the Mimi model. More info [here](#train-a-tokenizer-from-audio-files).
+
+    **Note:** Until Mimi is included in a stable release of HuggingFace Transformers, you need to install Transformers from source:
+    ```bash
+    pip install git+https://github.com/huggingface/transformers.git@main
+    ```
+
+**2024-09-19**
+
+- Initial Release!
 
 ## Setup
 ```bash
@@ -26,7 +46,7 @@ from transformers import (
 )
 from codec_bpe import codes_to_chars, chars_to_codes
 
-# load a codec BPE tokenizer and compatible language model
+# load a Codec BPE tokenizer and compatible language model
 device = "cuda" if torch.cuda.is_available() else "cpu"
 tokenizer = AutoTokenizer.from_pretrained("output/my_tokenizer")
 model = AutoModelForCausalLM.from_pretrained("output/my_model").to(device)
@@ -81,6 +101,13 @@ To train a tokenizer from audio files:
         --dac_model 44khz \
         --n_quantizers 4 \
         --use_dac
+
+    # encode audio files using first 6 codebooks of Mimi (24kHz)
+    python -m codec_bpe.audio_to_codes \
+        --audio_path path/to/audio \
+        --mimi_model kyutai/mimi \
+        --n_quantizers 6 \
+        --use_mimi
     ```
 
 2. Suppose you want to use the first 4 codebooks of [EnCodec 24 kHz](https://huggingface.co/facebook/encodec_24khz), run:
@@ -92,7 +119,7 @@ To train a tokenizer from audio files:
         --codec_framerate 75 \
         --chunk_size_secs 30 \
         --vocab_size 30000 \
-        --pad_token <pad> \
+        --pad_token "<pad>" \
         --save_path output/my_tokenizer
     ```
     Here: 
@@ -105,20 +132,20 @@ To train a tokenizer from audio files:
     See [train_tokenizer.py](codec_bpe/train_tokenizer.py) for a complete list of supported arguments.
 
 ### Extend an existing Transformers PreTrainedTokenizer
-You may want to train a new codec BPE tokenizer and then export its trained vocabulary to an existing Transformers tokenizer. For example, extending the Llama3, Mistral, Qwen, etc. tokenizers for multimodal text-audio language modeling.
+You may want to train a new Codec BPE tokenizer and then export its trained vocabulary to an existing Transformers tokenizer. For example, extending the Llama3, Mistral, Qwen, etc. tokenizers for multimodal text-audio language modeling.
 
-Suppose you have trained your codec BPE tokenizer and saved it to `output/tokenizer.json` and you want to extend the Mistral-7B-v0.1 tokenizer with its vocabulary, run:
+Suppose you have trained your Codec BPE tokenizer and saved it to `output/tokenizer.json` and you want to extend the Mistral-7B-v0.1 tokenizer with its vocabulary, run:
 ```bash
 python -m codec_bpe.extend_tokenizer \
     --existing_tokenizer mistralai/Mistral-7B-v0.1 \
     --codec_bpe_tokenizer output/my_tokenizer \
-    --audio_start_token <audio> \ # optional
-    --audio_end_token </audio>    # optional
+    --audio_start_token "<audio>" \ # optional
+    --audio_end_token "</audio>"    # optional
 ```
 This will simply add every token in `output/tokenizer.json` to the `mistralai/Mistral-7B-v0.1` tokenizer as a special token and save a copy of the latter. 
 
 #### Avoiding vocabulary conflicts
-If the added codec BPE unicode tokens would conflict with existing tokens in the vocabulary, there are two options to mitigate this:
+If the added Codec BPE unicode tokens would conflict with existing tokens in the vocabulary, there are two options to mitigate this:
 
 1. Override the default unicode offset using the `unicode_offset` argument for both `codec_bpe.train_tokenizer` and `codec_bpe.extend_tokenizer`. By default, unicode characters from the [CJK Unified Ideographs](https://symbl.cc/en/unicode-table/#cjk-unified-ideographs) block are used, following the Acoustic BPE paper. You can set `unicode_offset` to a different value to use a different unicode block that doesn't conflict with your existing vocabulary.
 
@@ -127,8 +154,8 @@ If the added codec BPE unicode tokens would conflict with existing tokens in the
     python -m codec_bpe.extend_tokenizer \
         --existing_tokenizer mistralai/Mistral-7B-v0.1 \
         --codec_bpe_tokenizer output/my_tokenizer \
-        --audio_start_token <audio> \ # optional
-        --audio_end_token </audio> \  # optional
+        --audio_start_token "<audio>" \ # optional
+        --audio_end_token "</audio>" \  # optional
         --use_special_token_format
     ```
     Then when preparing audio for tokenization with the extended tokenizer, you can pass the same argument to the `codes_to_chars` function:

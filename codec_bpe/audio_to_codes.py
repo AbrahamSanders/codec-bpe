@@ -11,21 +11,18 @@ if __name__ == "__main__":
     parser.add_argument("--audio_path", type=str, default="audio", help="Directory containing the audio files")
     parser.add_argument("--codes_path", type=str, default="output/codes", help="Directory to save the numpy codes files")
     parser.add_argument("--chunk_size_secs", type=int, default=60, help="Chunk size in seconds")
-    parser.add_argument("--encodec_model", type=str, default="facebook/encodec_24khz", help="Encodec model name. Ignored if --use_dac is set.")
-    parser.add_argument("--bandwidth", type=float, default=6.0, help="Bandwidth for encoding. Ignored if --use_dac is set.")
+    parser.add_argument("--encodec_model", type=str, default="facebook/encodec_24khz", help="Encodec model name. Ignored if --use_dac or --use_mimi are set.")
+    parser.add_argument("--bandwidth", type=float, default=6.0, help="Bandwidth for encoding. Ignored if --use_dac or --use_mimi are set.")
     parser.add_argument("--dac_model", type=str, default="16khz", help="DAC model name. Only applies if --use_dac is set.")
-    parser.add_argument("--n_quantizers", type=int, default=None, help="Number of quantizers for DAC model. None to use all quantizers. Only applies if --use_dac is set.")
+    parser.add_argument("--mimi_model", type=str, default="kyutai/mimi", help="Mimi model name. Only applies if --use_mimi is set.")
+    parser.add_argument("--n_quantizers", type=int, default=None, help="Number of quantizers for DAC model. None to use all quantizers. Only applies if --use_dac or --use_mimi are set.")
     parser.add_argument("--use_dac", action="store_true", help="Use DAC model instead of Encodec model")
+    parser.add_argument("--use_mimi", action="store_true", help="Use Mimi model instead of Encodec model")
     parser.add_argument("--stereo", action="store_true", help="Encode stereo audio channels separately instead of converting to mono")
     parser.add_argument("--extensions", nargs="+", default=[".mp3", ".wav", ".flac", ".opus"], help="Audio file extensions to convert. Formats must be supported by a librosa backend.")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing numpy codes directories. If not set, audio corresponding to existing numpy codes directories will be skipped.")
     args = parser.parse_args()
 
-    args.codes_path = os.path.join(
-        args.codes_path, 
-        f"dac_{args.dac_model}" if args.use_dac else args.encodec_model.split("/")[-1], 
-        "stereo" if args.stereo else "mono"
-    )
     device = "cuda" if torch.cuda.is_available() else "cpu"
     if args.use_dac:
         import dac
@@ -33,11 +30,19 @@ if __name__ == "__main__":
         model_path = dac.utils.download(model_type=args.dac_model)
         model = dac.DAC.load(model_path).to(device)
         model.eval()
+        codec_name_for_path = f"dac_{args.dac_model}"
+    elif args.use_mimi:
+        from transformers import MimiModel, AutoProcessor
+        model = MimiModel.from_pretrained(args.mimi_model).to(device)
+        processor = AutoProcessor.from_pretrained(args.mimi_model)
+        codec_name_for_path = args.mimi_model.split("/")[-1]
     else:
         from transformers import EncodecModel, AutoProcessor
         model = EncodecModel.from_pretrained(args.encodec_model).to(device)
         processor = AutoProcessor.from_pretrained(args.encodec_model)
+        codec_name_for_path = args.encodec_model.split("/")[-1]
 
+    codes_path = os.path.join(args.codes_path, codec_name_for_path, "stereo" if args.stereo else "mono")
     num_audio_files = 0
     num_converted_audio_files = 0
     num_numpy_files = 0
@@ -46,7 +51,7 @@ if __name__ == "__main__":
         files = sorted([f for f in files if os.path.splitext(f)[1] in args.extensions])
         if len(files) == 0:
             continue
-        numpy_root = root.replace(args.audio_path, args.codes_path)
+        numpy_root = root.replace(args.audio_path, codes_path)
         if os.path.exists(numpy_root):
             if args.overwrite:
                 shutil.rmtree(numpy_root)
@@ -79,6 +84,12 @@ if __name__ == "__main__":
                             # encode
                             with torch.no_grad():
                                 _, encoded_chunk, _, _, _ = model.encode(inputs, n_quantizers=args.n_quantizers)
+                        elif args.use_mimi:
+                            # prepare for model
+                            inputs = processor(raw_audio=channel_chunk, sampling_rate=sr, return_tensors="pt").to(device)
+                            # encode
+                            with torch.no_grad():
+                                encoded_chunk = model.encode(**inputs, num_quantizers=args.n_quantizers).audio_codes
                         else:
                             # prepare for model
                             inputs = processor(raw_audio=channel_chunk, sampling_rate=sr, return_tensors="pt").to(device)

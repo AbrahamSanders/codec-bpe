@@ -29,7 +29,7 @@ pip install codec-bpe
 ## Usage
 
 ### Convert audio codes to and from unicode strings
-Use your codec of choice (e.g., EnCodec, DAC) to encode your audio into a torch tensor or numpy array of codes of shape (num_codebooks, length), then use the provided converter methods to convert to and from unicode strings.
+Use your codec of choice (e.g., EnCodec, DAC, Mimi) to encode your audio into a torch tensor or numpy array of codes of shape (num_codebooks, length), then use the provided converter methods to convert to and from unicode strings.
 
 **Note:** In the Acoustic BPE paper, a single-level codec was used (HuBERT + k-means), where each encoded timestep consisted of a single code which was converted to a single unicode character. Here, we support multi-level codecs based on Residual Vector Quantizers. If num_codebooks > 1, a flattening pattern is used to interleave all codebooks into a single level before mapping to unicode. For example, if 4 codebooks are used then each encoded timestep would consist of 4 codes (one from each codebook) and would be converted to a unicode 4-gram.
 
@@ -87,7 +87,7 @@ sf.write("some_audio_output.wav", audio_2.cpu().numpy(), sr)
 ### Train a tokenizer from audio files
 To train a tokenizer from audio files:
 
-1. Use your codec of choice (e.g., EnCodec, DAC) to encode each audio file into a directory of numpy arrays (.npy files):
+1. Use your codec of choice (e.g., EnCodec, DAC, Mimi) to encode each audio file into a directory of numpy arrays (.npy files):
     ```bash
     # encode audio files using EnCodec 24 kHz at 3 kbps (4 codebooks)
     python -m codec_bpe.audio_to_codes \

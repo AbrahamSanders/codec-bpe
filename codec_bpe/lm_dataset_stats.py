@@ -6,7 +6,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compute statistics for a plain-text codec BPE dataset")
     parser.add_argument("--dataset_path", type=str, required=True)
     parser.add_argument("--num_codebooks", type=int, required=True)
-    parser.add_argument("--codec_framerate", type=int, required=True)
+    parser.add_argument("--codec_framerate", type=float, required=True)
     parser.add_argument("--audio_start_token", type=str)
     parser.add_argument("--audio_end_token", type=str)
     parser.add_argument("--num_examples", type=int, default=None)

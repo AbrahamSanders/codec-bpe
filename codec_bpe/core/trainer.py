@@ -13,7 +13,7 @@ class Trainer:
         self, 
         num_codebooks: int,
         codebook_size: int,
-        codec_framerate: Optional[int] = None,
+        codec_framerate: Optional[float] = None,
         chunk_size_secs: Optional[int] = None,
         vocab_size: int = 30000,
         min_frequency: int = 2,
@@ -63,7 +63,7 @@ class Trainer:
             elif len(codes.shape) == 3:
                 codes = codes[0]
             codes = codes[:self.num_codebooks]
-            chunk_size = self.chunk_size_secs * self.codec_framerate if self.chunk_size_secs else codes.shape[1]
+            chunk_size = int(self.chunk_size_secs * self.codec_framerate) if self.chunk_size_secs else codes.shape[1]
             for i in range(0, codes.shape[1], chunk_size):
                 chars = codes_to_chars(
                     codes[:, i:i+chunk_size], 

@@ -8,7 +8,7 @@ if __name__ == "__main__":
     parser.add_argument("--codes_path", type=str, required=True)
     parser.add_argument("--num_codebooks", type=int, required=True)
     parser.add_argument("--codebook_size", type=int, required=True)
-    parser.add_argument("--codec_framerate", type=int, default=None)
+    parser.add_argument("--codec_framerate", type=float, default=None)
     parser.add_argument("--chunk_size_secs", type=int, default=None)
     parser.add_argument("--vocab_size", type=int, default=30000)
     parser.add_argument("--min_frequency", type=int, default=2)

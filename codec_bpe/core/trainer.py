@@ -94,7 +94,9 @@ class Trainer:
         # For example if num_codebooks = 4 and max_token_codebook_ngrams = 5, the maximum token length would be 20.
         max_token_length = None
         if self.max_token_codebook_ngrams is not None and self.max_token_codebook_ngrams > 0:
-            max_token_length = self.max_token_codebook_ngrams * self.num_codebooks
+            # the +1 is because max_token_length is exclusive (e.g., max_token_length of n yields an actual max token length of n-1).
+            # not sure if this is a bug in Tokenizers or intended behavior.
+            max_token_length = self.max_token_codebook_ngrams * self.num_codebooks + 1
 
         # Train tokenizer
         codes_files = get_codes_files(codes_path, codes_filter, num_files)

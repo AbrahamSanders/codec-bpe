@@ -14,6 +14,7 @@ class CodecTypes(Enum):
     DAC = "dac"
     MIMI = "mimi"
     FUNCODEC = "funcodec"
+    HERTZ_CODEC = "hertz_codec"
 
     @classmethod
     def try_get_codec_type(cls, codec_model):
@@ -26,6 +27,8 @@ class CodecTypes(Enum):
             return cls.DAC
         if "mimi" in codec_model:
             return cls.MIMI
+        if "hertz" in codec_model:
+            return cls.HERTZ_CODEC
         raise ValueError(f"Could not infer codec type from codec model: {codec_model}. Please specify --codec_type.")
 
     def __str__(self):
@@ -83,6 +86,10 @@ class AudioEncoder:
             self.model = Speech2Token(config_file, model_pth, device=str(self.device))
             self.model.eval()
             self.processor = None
+        elif self.codec_type == CodecTypes.HERTZ_CODEC:
+            from .hertz_utils import HertzCodec
+            self.model = HertzCodec(device=self.device)
+            self.processor = None
         else:
             from transformers import AutoModel, AutoProcessor
             self.model = AutoModel.from_pretrained(self.codec_model).to(self.device)
@@ -111,6 +118,15 @@ class AudioEncoder:
                 )
             # Permute dimensions to match expected format
             audio_codes = torch.permute(encoded_batch[0], (1, 0, 2))
+        elif self.codec_type == CodecTypes.HERTZ_CODEC:
+            # Process audio to get padded input tensor
+            max_chunk_len = max([chunk.shape[-1] for chunk in batch])
+            batch_tensors = [F.pad(torch.from_numpy(chunk), (0, max_chunk_len-chunk.shape[-1])) for chunk in batch]
+            input_values = torch.stack(batch_tensors).unsqueeze(1).to(self.device)
+            
+            # Encode the batch
+            with torch.no_grad():
+                audio_codes = self.model.encode(input_values)
         else:
             # Process audio to get padded input tensor
             inputs = self.processor(raw_audio=batch, sampling_rate=self.sr, return_tensors="pt").to(self.device)

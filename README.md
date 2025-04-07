@@ -45,7 +45,7 @@ pip install codec-bpe[xcodec2]
 | [🤗 DAC 24khz](https://huggingface.co/descript/dac_24khz)          | 24                 | 75             | 32             | 1024          | 24                    | General         |
 | [🤗 DAC 16khz](https://huggingface.co/descript/dac_16khz)          | 16                 | 50             | 12             | 1024          | 6                     | General         |
 | [🤗 Mimi](https://huggingface.co/kyutai/mimi)                      | 24                 | 12.5           | 32             | 2048          | 4.4                   | Speech          |
-| [🤗 XCodec2] (https://huggingface.co/HKUSTAudio/xcodec2)           | 16                 | 50             | 1              | 65536         | 0.8                   | Speech          |
+| [🤗 XCodec2](https://huggingface.co/HKUSTAudio/xcodec2)            | 16                 | 50             | 1              | 65536         | 0.8                   | Speech          |
 | [🤗 FunCodec zh_en-general-16k-nq32ds640](https://huggingface.co/alibaba-damo/audio_codec-encodec-zh_en-general-16k-nq32ds640-pytorch) | 16 | 25 | 32 | 1024 | 8  | General         |
 | [🤗 FunCodec zh_en-general-16k-nq32ds320](https://huggingface.co/alibaba-damo/audio_codec-encodec-zh_en-general-16k-nq32ds320-pytorch) | 16 | 50 | 32 | 1024 | 16 | General         |
 | [🤗 FunCodec en-libritts-16k-nq32ds640](https://huggingface.co/alibaba-damo/audio_codec-encodec-en-libritts-16k-nq32ds640-pytorch)     | 16 | 25 | 32 | 1024 | 8  | Audiobooks      |

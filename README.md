@@ -5,7 +5,7 @@ Codec BPE is an implementation of [Acoustic BPE](https://arxiv.org/abs/2310.1458
 
 Codec BPE flattens multi-level codes from Residual Vector Quantizers (RVQ) and converts them into unicode strings for tokenization into compressed token sequences. For example, a single Codec BPE token might represent a 4-gram of codes from 4 codebooks representing a single acoustic unit, a 6-gram comprising a whole acoustic unit and half of the next one, or even an 8-gram represnting two whole acoustic units. Depending on the codec, vocab size and type of audio, this can yield savings of 2-5x in sequence length compared to directly modeling the flattened codebooks.
 
-Codec BPE can also be used with single-level codecs such as [XCodec2](https://github.com/zhenye234/X-Codec-2.0). In this case, a single Codec BPE token could represent one or more codes where each code represents a whole acoustic unit.
+Codec BPE can also be used with single-level codecs such as [XCodec2](https://github.com/zhenye234/X-Codec-2.0) (Ye et al., 2025). In this case, a single Codec BPE token could represent one or more codes where each code represents a whole acoustic unit.
 
 **Using Codec BPE allows efficient audio language modeling with multi-level codecs to be done with vanilla LLM architectures, meaning no custom architecture is needed to deal with modeling the RVQ. Your model will already be compatible with the full ecosystem of training and inference tools available for [HuggingFace Transformers](https://github.com/huggingface/transformers), such as [vLLM](https://github.com/vllm-project/vllm) and [Ollama](https://ollama.com/)!**
 

@@ -178,15 +178,20 @@ class AudioEncoder:
         audio_path: str,
         codes_path: str,
         extensions: List[str] = SUPPORTED_EXTENSIONS,
+        audio_filter: Optional[Union[str, List[str]]] = None,
         overwrite: bool = False,
     ) -> AudioEncodeResult:
         # traverse the audio directory recursively and convert in each subdirectory containing
         # audio fileswith the specified extensions
+        if isinstance(audio_filter, str):
+            audio_filter = [audio_filter]
         result = AudioEncodeResult()
         batch = []
         batch_info = []
         for root, _, files in os.walk(audio_path):
-            files = sorted([f for f in files if os.path.splitext(f)[1] in extensions])
+            files = sorted([os.path.join(root, f) for f in files if os.path.splitext(f)[1] in extensions])
+            if audio_filter:
+                files = [f for f in files if any([filter_ in f for filter_ in audio_filter])]
             if len(files) == 0:
                 continue
             numpy_root = root.replace(audio_path, codes_path)
@@ -198,8 +203,7 @@ class AudioEncoder:
                     result.num_skipped_dirs += 1
                     continue
             print(f"Converting in {root}...")
-            for file in tqdm(files, desc="Files"):
-                file_path = os.path.join(root, file)
+            for file_path in tqdm(files, desc="Files"):
                 result.num_audio_files += 1
                 try:
                     # Load the audio file

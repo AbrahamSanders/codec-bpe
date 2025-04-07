@@ -76,6 +76,13 @@ if __name__ == "__main__":
         help="Audio file extensions to convert. Formats must be supported by a librosa backend.",
     )
     parser.add_argument(
+        "--audio_filter", 
+        nargs="+",
+        help=(
+            "Audio file filters. If provided, file paths must match one of the filters to be converted."
+        )
+    )
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help=(
@@ -115,6 +122,7 @@ if __name__ == "__main__":
             args.audio_path,
             args.codes_path,
             extensions=args.extensions,
+            audio_filter=args.audio_filter,
             overwrite=args.overwrite,
         )
         # Print summary

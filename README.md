@@ -5,11 +5,14 @@ Codec BPE is an implementation of [Acoustic BPE](https://arxiv.org/abs/2310.1458
 
 Codec BPE flattens multi-level codes from Residual Vector Quantizers (RVQ) and converts them into unicode strings for tokenization into compressed token sequences. For example, a single Codec BPE token might represent a 4-gram of codes from 4 codebooks representing a single acoustic unit, a 6-gram comprising a whole acoustic unit and half of the next one, or even an 8-gram represnting two whole acoustic units. Depending on the codec, vocab size and type of audio, this can yield savings of 2-5x in sequence length compared to directly modeling the flattened codebooks.
 
-Codec BPE can also be used with single-level codecs such as that used in the Acoustic BPE paper. In this case, a single Codec BPE token could represent one or more codes where each code represents a whole acoustic unit.
+Codec BPE can also be used with single-level codecs such as [XCodec2](https://github.com/zhenye234/X-Codec-2.0). In this case, a single Codec BPE token could represent one or more codes where each code represents a whole acoustic unit.
 
 **Using Codec BPE allows efficient audio language modeling with multi-level codecs to be done with vanilla LLM architectures, meaning no custom architecture is needed to deal with modeling the RVQ. Your model will already be compatible with the full ecosystem of training and inference tools available for [HuggingFace Transformers](https://github.com/huggingface/transformers), such as [vLLM](https://github.com/vllm-project/vllm) and [Ollama](https://ollama.com/)!**
 
 ## 🚀 Updates
+**2025-04-07**
+- Added support for [XCodec2](https://huggingface.co/HKUSTAudio/xcodec2), a high-quality multilingual single-level codec with a 50 Hz framerate! Use `--codec_model HKUSTAudio/xcodec2` when encoding audio with `codec_bpe.audio_to_codes` to encode using the XCodec2 model. See [here](#train-a-tokenizer-from-audio-files) for a usage example.
+
 **2025-03-09**
 - Added support for [FunCodec](https://funcodec.github.io/) from Alibaba DAMO Speech Lab! Use `--codec_model alibaba-damo/...` when encoding audio with `codec_bpe.audio_to_codes` to encode using the FunCodec model. Model paths on the HuggingFace hub are listed [here](https://github.com/modelscope/FunCodec?tab=readme-ov-file#available-models). See [here](#train-a-tokenizer-from-audio-files) for a usage example.
 
@@ -25,9 +28,13 @@ Codec BPE can also be used with single-level codecs such as that used in the Aco
 ```bash
 pip install codec-bpe
 ```
-If you want to use the `--codec_type funcodec` option with `codec_bpe.audio_to_codes`, run:
+If you want to use the `--codec_type funcodec` or `--codec_model alibaba-damo/...` options with `codec_bpe.audio_to_codes`, run:
 ```bash
 pip install codec-bpe[funcodec]
+```
+If you want to use the `--codec_type xcodec2` or `--codec_model HKUSTAudio/xcodec2` options with `codec_bpe.audio_to_codes`, run:
+```bash
+pip install codec-bpe[xcodec2]
 ```
 
 ## Supported Codecs
@@ -38,6 +45,7 @@ pip install codec-bpe[funcodec]
 | [🤗 DAC 24khz](https://huggingface.co/descript/dac_24khz)          | 24                 | 75             | 32             | 1024          | 24                    | General         |
 | [🤗 DAC 16khz](https://huggingface.co/descript/dac_16khz)          | 16                 | 50             | 12             | 1024          | 6                     | General         |
 | [🤗 Mimi](https://huggingface.co/kyutai/mimi)                      | 24                 | 12.5           | 32             | 2048          | 4.4                   | Speech          |
+| [🤗 XCodec2] (https://huggingface.co/HKUSTAudio/xcodec2)           | 16                 | 50             | 1              | 65536         | 0.8                   | Speech          |
 | [🤗 FunCodec zh_en-general-16k-nq32ds640](https://huggingface.co/alibaba-damo/audio_codec-encodec-zh_en-general-16k-nq32ds640-pytorch) | 16 | 25 | 32 | 1024 | 8  | General         |
 | [🤗 FunCodec zh_en-general-16k-nq32ds320](https://huggingface.co/alibaba-damo/audio_codec-encodec-zh_en-general-16k-nq32ds320-pytorch) | 16 | 50 | 32 | 1024 | 16 | General         |
 | [🤗 FunCodec en-libritts-16k-nq32ds640](https://huggingface.co/alibaba-damo/audio_codec-encodec-en-libritts-16k-nq32ds640-pytorch)     | 16 | 25 | 32 | 1024 | 8  | Audiobooks      |
@@ -47,12 +55,12 @@ pip install codec-bpe[funcodec]
 
 \* Framerate (Hz) is the number of timesteps (acoustic units of size `num_codebooks`) per second output by the codec.
 
-\* Bandwidth (kbps) = `framerate (Hz) x num_codebooks x log2(codebook_size)`.
+\* Bandwidth (kbps) = `framerate (Hz) x num_codebooks x log2(codebook_size) / 1000`.
 
 ## Usage
 
 ### Convert audio codes to and from unicode strings
-Use your codec of choice (e.g., EnCodec, DAC, Mimi, FunCodec) to encode your audio into a torch tensor or numpy array of codes of shape (num_codebooks, length), then use the provided converter methods to convert to and from unicode strings.
+Use your codec of choice (e.g., EnCodec, DAC, Mimi, XCodec2, FunCodec) to encode your audio into a torch tensor or numpy array of codes of shape (num_codebooks, length), then use the provided converter methods to convert to and from unicode strings.
 
 **Note:** In the Acoustic BPE paper, a single-level codec was used (HuBERT + k-means), where each encoded timestep consisted of a single code which was converted to a single unicode character. Here, we support multi-level codecs based on Residual Vector Quantizers. If num_codebooks > 1, a flattening pattern is used to interleave all codebooks into a single level before mapping to unicode. For example, if 4 codebooks are used then each encoded timestep would consist of 4 codes (one from each codebook) and would be converted to a unicode 4-gram.
 
@@ -133,6 +141,12 @@ To train a tokenizer from audio files:
         --n_quantizers 6 \
         --batch_size 8
 
+    # encode audio files using XCodec2 (16kHz, there is only 1 codebook)
+    python -m codec_bpe.audio_to_codes \
+        --audio_path path/to/audio \
+        --codec_model HKUSTAudio/xcodec2 \
+        --batch_size 1 # XCodec2 only supports batch size 1 for now.
+
     # encode audio files using FunCodec (16kHz) at 1.5 kbps (6 codebooks)
     python -m codec_bpe.audio_to_codes \
         --audio_path path/to/audio \
@@ -187,7 +201,19 @@ python -m codec_bpe.train_tokenizer \
     --max_token_codebook_ngrams 2
 ```
 
-**It is highly recommended to set this argument to a value <= 2 to ensure that your `vocab_size` budget gets distributed across diverse acoustic patterns in your training data.**
+**It is highly recommended to set this argument to a value <= 2 (or <= 4 if num_codebooks is 1) to ensure that your `vocab_size` budget gets distributed across diverse acoustic patterns in your training data.**
+
+#### Using a codec with a very large codebook size
+If you are using a codec with a very large codebook size (e.g. XCodec2, which has a codebook size of 65536), you may need to adjust the `unicode_offset` argument for `codec_bpe.train_tokenizer` to avoid the non-printable surrogate range 0xD800-0xDFFF:
+```bash
+python -m codec_bpe.train_tokenizer \
+    --codes_path output/codes/xcodec2/mono \
+    --chunk_size_secs 30 \
+    --vocab_size 80000 \
+    --pad_token "<pad>" \
+    --max_token_codebook_ngrams 4 \
+    --unicode_offset 0xE000
+```
 
 Setting `max_token_codebook_ngrams = 0` will skip tokenizer training and simply output a base vocabulary of `num_codebooks x codebook_size` tokens, each representing a single code from a single codebook. This is useful if you want to directly model individual codes from the flattened codebooks instead of combining them into n-grams.
 
@@ -205,4 +231,4 @@ python -m codec_bpe.extend_tokenizer \
 This will simply add every token in `output/encodec_bpe_4cb_30k/tokenizer.json` to the `mistralai/Mistral-7B-v0.1` tokenizer as a special token and save a copy of the latter. 
 
 #### Avoiding vocabulary conflicts
-If the added Codec BPE unicode tokens would conflict with existing tokens in the vocabulary, you can override the default unicode offset using the `unicode_offset` argument for both `codec_bpe.train_tokenizer` and `codec_bpe.extend_tokenizer`. By default, unicode characters from the [CJK Unified Ideographs](https://symbl.cc/en/unicode-table/#cjk-unified-ideographs) block are used, following the Acoustic BPE paper. You can set `unicode_offset` to a different value to use a different unicode block that doesn't conflict with your existing vocabulary.
+If the added Codec BPE unicode tokens would conflict with existing tokens in the vocabulary, you can override the default unicode offset using the `unicode_offset` argument for `codec_bpe.train_tokenizer`. By default, unicode characters from the [CJK Unified Ideographs](https://symbl.cc/en/unicode-table/#cjk-unified-ideographs) block are used, following the Acoustic BPE paper. You can set `unicode_offset` to a different value (e.g. 0xE000) to start from a different unicode block that won't conflict with your existing vocabulary.

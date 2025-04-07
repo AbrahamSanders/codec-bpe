@@ -3,7 +3,7 @@ from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 from tqdm import tqdm
 import numpy as np
 
-from ..core.converter import codes_to_chars, UNICODE_OFFSET
+from ..core.converter import codes_to_chars, validate_unicode_offset, UNICODE_OFFSET
 from ..core.utils import get_codes_files
 
 class LMDatasetBuilder:
@@ -22,7 +22,7 @@ class LMDatasetBuilder:
         self.tokenizer = tokenizer
         self.num_codebooks = num_codebooks
         self.codebook_size = codebook_size
-        self.unicode_offset = unicode_offset
+        self.unicode_offset = validate_unicode_offset(unicode_offset, num_codebooks, codebook_size)
         self.sequence_length = sequence_length
         self.overlap_length = overlap_length
         self.drop_last = drop_last

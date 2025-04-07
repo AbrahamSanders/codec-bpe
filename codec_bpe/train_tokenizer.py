@@ -1,4 +1,5 @@
 import argparse
+import functools
 
 from .core.trainer import Trainer
 from .core.utils import get_codec_info, update_args_from_codec_info
@@ -19,7 +20,8 @@ if __name__ == "__main__":
     parser.add_argument("--unk_token", type=str)
     parser.add_argument("--pad_token", type=str)
     parser.add_argument("--max_token_codebook_ngrams", type=int, default=None)
-    parser.add_argument("--unicode_offset", type=int, default=UNICODE_OFFSET)
+    # handle hex values for unicode_offset with argparse: https://stackoverflow.com/a/25513044
+    parser.add_argument("--unicode_offset", type=functools.partial(int, base=0), default=UNICODE_OFFSET)
     parser.add_argument("--save_path", type=str)
     parser.add_argument("--codes_filter", type=str, nargs="+")
     parser.add_argument("--num_files", type=int, default=None)

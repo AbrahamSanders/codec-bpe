@@ -34,5 +34,6 @@ setup(
     install_requires=read_requirements("requirements.txt"),
     extras_require={
         "funcodec": read_requirements("requirements_funcodec.txt"),
+        "xcodec2": read_requirements("requirements_xcodec2.txt"),
     },
 )

@@ -5,7 +5,7 @@ from tokenizers import AddedToken
 from transformers import PreTrainedTokenizerFast
 
 from .sentencepiece_bpe import SentencePieceBPETokenizer
-from .converter import codes_to_chars, UNICODE_OFFSET
+from .converter import codes_to_chars, validate_unicode_offset, UNICODE_OFFSET
 from .utils import get_codes_files
 
 class Trainer:
@@ -49,13 +49,23 @@ class Trainer:
         self.unk_token = unk_token
         self.pad_token = pad_token
         self.max_token_codebook_ngrams = max_token_codebook_ngrams
-        self.unicode_offset = unicode_offset
+        self.unicode_offset = validate_unicode_offset(unicode_offset, num_codebooks, codebook_size)
 
         if self.special_tokens is None:
             self.special_tokens = []
         for special_token in [self.eos_token, self.bos_token, self.unk_token, self.pad_token]:
             if special_token is not None and special_token not in self.special_tokens:
                 self.special_tokens.insert(0, special_token)
+
+        min_vocab_size = self.num_codebooks*self.codebook_size + len(self.special_tokens)
+        if self.vocab_size < min_vocab_size:
+            raise ValueError(
+                f"vocab_size is set to {self.vocab_size} but it must be at least {min_vocab_size} to accommodate "
+                f"{self.num_codebooks} x {self.codebook_size} codes and {len(self.special_tokens)} special token(s).\n"
+                f"Consider setting vocab_size to {min_vocab_size} + K, where K is the number of tokens you want to "
+                "reserve for codebook ngrams (learned merges). K should be a sufficiently large number (e.g. >= 10,000) "
+                "to allow for wide coverage of the most common codebook ngrams in your training data."
+            )
 
     def _iterate_and_convert(self, codes_files: List[str]) -> Iterator[str]:
         for codes_file in codes_files:

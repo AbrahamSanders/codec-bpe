@@ -7,7 +7,12 @@ import numpy as np
 import torch
 
 logger = logging.getLogger(__name__)
+
 UNICODE_OFFSET: int = 0x4E00
+"""Original unicode offset from the Acoustic BPE paper (Shen et al., 2024)"""
+UNICODE_OFFSET_LARGE: int = 0xE000
+"""For very large codebook size (e.g. > 32768), use this higher unicode offset to avoid running into surrogates
+which are not printable and won't work with BPE tokenization."""
 
 def codes_to_chars(
     codes: Union[List[List[int]], np.ndarray, torch.Tensor], 
@@ -22,6 +27,7 @@ def codes_to_chars(
         codes = codes.cpu().numpy()
     if len(codes.shape) != 2:
         raise ValueError("codes must be a 2D array of shape (num_codebooks, seq_length).")
+    unicode_offset = validate_unicode_offset(unicode_offset, codes.shape[0], codebook_size)
     if copy_before_conversion:
         codes = codes.copy()
     for i in range(codes.shape[0]):
@@ -40,6 +46,7 @@ def chars_to_codes(
     return_tensors: Optional[str] = None, 
     unicode_offset: int = UNICODE_OFFSET,
 ) -> Union[List[List[int]], np.ndarray, torch.Tensor]:
+    unicode_offset = validate_unicode_offset(unicode_offset, num_codebooks, codebook_size)
     codes = np.array([ord(c) for c in chars])
     if drop_inconsistent_codes:
         codes = _drop_inconsistent_codes(codes, num_codebooks, codebook_size, unicode_offset)
@@ -57,6 +64,21 @@ def chars_to_codes(
         end_hanging = "".join([chr(c) for c in end_hanging])
         return codes, begin_hanging, end_hanging
     return codes
+
+def validate_unicode_offset(unicode_offset: int, num_codebooks: int, codebook_size: int) -> int:
+    # If the range [unicode_offset, unicode_offset+num_codebooks*codebook_size) intersects with the
+    # surrogate range [0xD800, 0xDFFF], then we need to use the large unicode offset.
+    lower = unicode_offset
+    upper = unicode_offset + num_codebooks * codebook_size
+    surrogate_lower = 0xD800
+    surrogate_upper = 0xDFFF
+    if lower < surrogate_upper and upper > surrogate_lower:
+        raise ValueError(
+            f"You are using unicode offset {hex(unicode_offset)}, however your base vocabulary size (num_codebooks x codebook_size) "
+            f"is {num_codebooks*codebook_size} which will intersect with the non-printable surrogate range 0xD800-0xDFFF if starting from this offset.\n"
+            f"To avoid this issue, use a unicode offset starting after the surrogate range, such as {hex(UNICODE_OFFSET_LARGE)}."
+        )
+    return unicode_offset
 
 def _resolve_codebook(code: int, num_codebooks: int, codebook_size: int, unicode_offset: int) -> int:
     codebook = num_codebooks-1

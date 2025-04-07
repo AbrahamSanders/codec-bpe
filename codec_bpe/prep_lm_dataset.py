@@ -1,5 +1,6 @@
 import argparse
 import os
+import functools
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
@@ -17,7 +18,8 @@ if __name__ == "__main__":
     parser.add_argument("--codebook_size", type=int, default=None)
     parser.add_argument("--audio_start_token", type=str)
     parser.add_argument("--audio_end_token", type=str)
-    parser.add_argument("--unicode_offset", type=int, default=UNICODE_OFFSET)
+    # handle hex values for unicode_offset with argparse: https://stackoverflow.com/a/25513044
+    parser.add_argument("--unicode_offset", type=functools.partial(int, base=0), default=UNICODE_OFFSET)
     parser.add_argument("--sequence_length", type=int, default=4096)
     parser.add_argument("--overlap_length", type=int, default=1024)
     parser.add_argument("--drop_last", action="store_true")

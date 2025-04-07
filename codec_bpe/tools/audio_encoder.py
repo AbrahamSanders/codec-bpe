@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 import math
 from typing import Optional, List, Union, Tuple, Dict
+from transformers.feature_extraction_utils import BatchFeature
 from enum import Enum
 from tqdm import tqdm
 
@@ -14,6 +15,7 @@ class CodecTypes(Enum):
     DAC = "dac"
     MIMI = "mimi"
     FUNCODEC = "funcodec"
+    XCODEC2 = "xcodec2"
 
     @classmethod
     def try_get_codec_type(cls, codec_model):
@@ -26,6 +28,8 @@ class CodecTypes(Enum):
             return cls.DAC
         if "mimi" in codec_model:
             return cls.MIMI
+        if "xcodec2" in codec_model:
+            return cls.XCODEC2
         raise ValueError(f"Could not infer codec type from codec model: {codec_model}. Please specify --codec_type.")
 
     def __str__(self):
@@ -34,6 +38,19 @@ class CodecTypes(Enum):
         return str(self) == value
 
 SUPPORTED_EXTENSIONS = [".mp3", ".wav", ".flac", ".opus"]
+
+class DefaultProcessor:
+    def __call__(self, raw_audio: Union[np.ndarray, List[np.ndarray]], sampling_rate: int, return_tensors: str = "pt") -> BatchFeature:
+        if not isinstance(raw_audio, list):
+            raw_audio = [raw_audio]
+        # Process audio to get padded input tensor
+        max_audio_len = max([audio.shape[-1] for audio in raw_audio])
+        batch_tensors = [F.pad(torch.from_numpy(audio), (0, max_audio_len-audio.shape[-1])) for audio in raw_audio]
+        inputs = BatchFeature(
+            data={"input_values": torch.stack(batch_tensors).unsqueeze(1).float()}, 
+            tensor_type=return_tensors,
+        )
+        return inputs
 
 class AudioEncodeResult:
     def __init__(self):
@@ -82,52 +99,49 @@ class AudioEncoder:
             model_pth = os.path.join(cache_path, "model.pth")
             self.model = Speech2Token(config_file, model_pth, device=str(self.device))
             self.model.eval()
-            self.processor = None
+            self.processor = DefaultProcessor()
+            self.sr = self.model.model_args.sampling_rate
+        elif self.codec_type == CodecTypes.XCODEC2:
+            if self.batch_size > 1:
+                raise ValueError("XCodec2 only supports batch size 1 for now.")
+            from xcodec2.modeling_xcodec2 import XCodec2Model
+            self.model = XCodec2Model.from_pretrained(self.codec_model).to(self.device)
+            self.processor = DefaultProcessor()
+            self.sr = self.model.feature_extractor.sampling_rate
         else:
             from transformers import AutoModel, AutoProcessor
             self.model = AutoModel.from_pretrained(self.codec_model).to(self.device)
             self.processor = AutoProcessor.from_pretrained(self.codec_model)
-
-        self.sr = (
-            self.model.model_args.sampling_rate if self.codec_type == CodecTypes.FUNCODEC 
-            else self.model.config.sampling_rate
-        )
+            self.sr = self.model.config.sampling_rate
 
     def _encode_batch(self, batch: List[np.ndarray]) -> Tuple[torch.Tensor, float]:
-        if self.codec_type == CodecTypes.FUNCODEC:
-            # Process audio to get padded input tensor
-            max_chunk_len = max([chunk.shape[-1] for chunk in batch])
-            batch_tensors = [F.pad(torch.from_numpy(chunk), (0, max_chunk_len-chunk.shape[-1])) for chunk in batch]
-            input_values = torch.stack(batch_tensors).unsqueeze(1).to(
-                device=self.device, dtype=getattr(torch, self.model.dtype)
-            )
+        # Process audio to get padded input tensor
+        inputs = self.processor(raw_audio=batch, sampling_rate=self.sr, return_tensors="pt").to(self.device)
+        input_values = inputs.input_values
 
-            # Encode the batch
-            with torch.no_grad():
+        # Encode the batch
+        with torch.no_grad():
+            if self.codec_type == CodecTypes.FUNCODEC:
                 encoded_batch, _, _, _ = self.model(
                     input_values,
                     bit_width=int(self.bandwidth) if self.bandwidth is not None else None,
                     run_mod="encode",
                 )
-            # Permute dimensions to match expected format
-            audio_codes = torch.permute(encoded_batch[0], (1, 0, 2))
-        else:
-            # Process audio to get padded input tensor
-            inputs = self.processor(raw_audio=batch, sampling_rate=self.sr, return_tensors="pt").to(self.device)
-            input_values = inputs.input_values
-            
-            encode_kwargs = {}
-            if self.codec_type == CodecTypes.DAC:
-                encode_kwargs["n_quantizers"] = self.n_quantizers
-            elif self.codec_type == CodecTypes.MIMI:
-                encode_kwargs["num_quantizers"] = self.n_quantizers
-            elif self.codec_type == CodecTypes.ENCODEC:
-                encode_kwargs["bandwidth"] = self.bandwidth
-            
-            # Encode the batch
-            with torch.no_grad():
+                # Permute dimensions to match expected format
+                audio_codes = torch.permute(encoded_batch[0], (1, 0, 2))
+            elif self.codec_type == CodecTypes.XCODEC2:
+                input_values = input_values.squeeze(1)
+                audio_codes = self.model.encode_code(input_values, sample_rate=self.sr)
+            else:
+                encode_kwargs = {}
+                if self.codec_type == CodecTypes.DAC:
+                    encode_kwargs["n_quantizers"] = self.n_quantizers
+                elif self.codec_type == CodecTypes.MIMI:
+                    encode_kwargs["num_quantizers"] = self.n_quantizers
+                elif self.codec_type == CodecTypes.ENCODEC:
+                    encode_kwargs["bandwidth"] = self.bandwidth
                 outputs = self.model.encode(**inputs, **encode_kwargs)
-            audio_codes = outputs.audio_codes
+                audio_codes = outputs.audio_codes
         
         samples_per_frame = math.ceil(input_values.shape[-1] / audio_codes.shape[-1])
         return audio_codes, samples_per_frame
@@ -232,10 +246,13 @@ class AudioEncoder:
         dummy_audio = np.zeros(10 * self.sr)
         audio_codes, samples_per_frame = self._encode_batch([dummy_audio])
         # get stats
-        codebook_size = (
-            self.model.model_args.quantizer_conf["codebook_size"] if self.codec_type == CodecTypes.FUNCODEC 
-            else self.model.config.codebook_size
-        )
+        if self.codec_type == CodecTypes.FUNCODEC:
+            codebook_size = self.model.model_args.quantizer_conf["codebook_size"]
+        elif self.codec_type == CodecTypes.XCODEC2:
+            codebook_size = 65536
+        else:
+            codebook_size = self.model.config.codebook_size
+
         # write codec info to json
         codec_info = {
             "codec_type": str(self.codec_type),

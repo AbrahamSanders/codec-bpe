@@ -1,18 +1,12 @@
-from typing import Optional, Union
+from typing import Optional, Union, List
 from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 from tqdm import trange
 
 def extend_existing_tokenizer(
     existing_tokenizer: Union[PreTrainedTokenizer, PreTrainedTokenizerFast],
     codec_bpe_tokenizer: Union[PreTrainedTokenizer, PreTrainedTokenizerFast],
-    audio_start_token: Optional[str] = None,
-    audio_end_token: Optional[str] = None,
+    additional_special_tokens: Optional[List[str]] = None,
 ) -> int:
-    additional_special_tokens = []
-    if audio_start_token is not None:
-        additional_special_tokens.append(audio_start_token)
-    if audio_end_token is not None:
-        additional_special_tokens.append(audio_end_token)
     target_tokens = []
     skip_token_ids = set([
         codec_bpe_tokenizer.bos_token_id, 
@@ -27,7 +21,7 @@ def extend_existing_tokenizer(
         target_tokens.append(token)
 
     num_added = 0
-    if len(additional_special_tokens) > 0:
+    if additional_special_tokens:
         num_added += existing_tokenizer.add_special_tokens(
             special_tokens_dict={"additional_special_tokens": additional_special_tokens}, 
             replace_additional_special_tokens=False,

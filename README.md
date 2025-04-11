@@ -225,10 +225,9 @@ Suppose you have trained your Codec BPE tokenizer and saved it to `output/encode
 python -m codec_bpe.extend_tokenizer \
     --existing_tokenizer mistralai/Mistral-7B-v0.1 \
     --codec_bpe_tokenizer output/encodec_bpe_4cb_30k \
-    --audio_start_token "<audio>" \ # optional
-    --audio_end_token "</audio>"    # optional
+    --additional_special_tokens "<audio>" "</audio>" # optional
 ```
-This will simply add every token in `output/encodec_bpe_4cb_30k/tokenizer.json` to the `mistralai/Mistral-7B-v0.1` tokenizer as a special token and save a copy of the latter. 
+This will simply add every token in `output/encodec_bpe_4cb_30k/tokenizer.json` to the `mistralai/Mistral-7B-v0.1` tokenizer as a special token and save a copy of the latter. Any additional tokens specified with `--additional_special_tokens` will be appended to the existing tokenizer's additional special token list.
 
 #### Avoiding vocabulary conflicts
 If the added Codec BPE unicode tokens would conflict with existing tokens in the vocabulary, you can override the default unicode offset using the `unicode_offset` argument for `codec_bpe.train_tokenizer`. By default, unicode characters from the [CJK Unified Ideographs](https://symbl.cc/en/unicode-table/#cjk-unified-ideographs) block are used, following the Acoustic BPE paper. You can set `unicode_offset` to a different value (e.g. 0xE000) to start from a different unicode block that won't conflict with your existing vocabulary.

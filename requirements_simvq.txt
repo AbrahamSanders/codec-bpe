@@ -1,2 +1,2 @@
 huggingface-hub
-xcodec2
+omegaconf

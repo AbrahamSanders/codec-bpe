@@ -1,15 +1,21 @@
 # codec-bpe
 ![codec_bpe.png](img/codec_bpe.png)
 
-Codec BPE is an implementation of [Acoustic BPE](https://arxiv.org/abs/2310.14580) (Shen et al., 2024), extended for RVQ-based Neural Audio Codecs such as [EnCodec](https://github.com/facebookresearch/encodec) (Défossez et al., 2022), [DAC](https://github.com/descriptinc/descript-audio-codec) (Kumar et al., 2023), and [Mimi](https://huggingface.co/kyutai/mimi) (Défossez et al., 2024), and [FunCodec](https://funcodec.github.io/) (Du et al., 2024). Built on top of the [HuggingFace Tokenizers](https://github.com/huggingface/tokenizers) library.
+Codec BPE is an implementation of [Acoustic BPE](https://arxiv.org/abs/2310.14580) (Shen et al., 2024), extended for RVQ-based Neural Audio Codecs such as [EnCodec](https://github.com/facebookresearch/encodec) (Défossez et al., 2022), [DAC](https://github.com/descriptinc/descript-audio-codec) (Kumar et al., 2023), [Mimi](https://huggingface.co/kyutai/mimi) (Défossez et al., 2024), and [FunCodec](https://funcodec.github.io/) (Du et al., 2024). Built on top of the [HuggingFace Tokenizers](https://github.com/huggingface/tokenizers) library.
 
 Codec BPE flattens multi-level codes from Residual Vector Quantizers (RVQ) and converts them into unicode strings for tokenization into compressed token sequences. For example, a single Codec BPE token might represent a 4-gram of codes from 4 codebooks representing a single acoustic unit, a 6-gram comprising a whole acoustic unit and half of the next one, or even an 8-gram represnting two whole acoustic units. Depending on the codec, vocab size and type of audio, this can yield savings of 2-5x in sequence length compared to directly modeling the flattened codebooks.
 
-Codec BPE can also be used with single-level codecs such as [XCodec2](https://github.com/zhenye234/X-Codec-2.0) (Ye et al., 2025). In this case, a single Codec BPE token could represent one or more codes where each code represents a whole acoustic unit.
+Codec BPE can also be used with single-level codecs such as [XCodec2](https://github.com/zhenye234/X-Codec-2.0) (Ye et al., 2025), [WavTokenizer](https://github.com/jishengpeng/WavTokenizer) (Ji et al., 2024), and [SimVQ](https://github.com/youngsheen/SimVQ) (Zhu et al., 2024). In this case, a single Codec BPE token could represent one or more codes where each code represents a whole acoustic unit.
 
 **Using Codec BPE allows efficient audio language modeling with multi-level codecs to be done with vanilla LLM architectures, meaning no custom architecture is needed to deal with modeling the RVQ. Your model will already be compatible with the full ecosystem of training and inference tools available for [HuggingFace Transformers](https://github.com/huggingface/transformers), such as [vLLM](https://github.com/vllm-project/vllm) and [Ollama](https://ollama.com/)!**
 
 ## 🚀 Updates
+**2025-06-16**
+- Added support for [WavTokenizer](https://github.com/jishengpeng/WavTokenizer) and [SimVQ](https://github.com/youngsheen/SimVQ)! Both are single-level codecs that share the same architecture but differ in their VQ strategy. WavTokenizer comes in 40Hz and 75Hz variants with a vocabulary size of 4096. SimVQ variants have a 75Hz framerate with vocabulary sizes ranging from 4096 to 262144 codes. SimVQ also features a causal encoder and partially causal decoder, making it suitable for streaming use cases. 
+  - Use `--codec_model WavTokenizer-large-320-24k-4096` (or any other from the `Model` column on [this table](#supported-codecs)) with `codec_bpe.audio_to_codes` to encode audio using WavTokenizer.
+  - Use `--codec_model simvq_4k` (or any other from the `Model` column on [this table](#supported-codecs)) with `codec_bpe.audio_to_codes` to encode audio using SimVQ.
+  - See [here](#train-a-tokenizer-from-audio-files) for usage examples.
+
 **2025-04-07**
 - Added support for [XCodec2](https://huggingface.co/HKUSTAudio/xcodec2), a high-quality multilingual single-level codec with a 50 Hz framerate! Use `--codec_model HKUSTAudio/xcodec2` when encoding audio with `codec_bpe.audio_to_codes` to encode using the XCodec2 model. See [here](#train-a-tokenizer-from-audio-files) for a usage example.
 
@@ -17,11 +23,9 @@ Codec BPE can also be used with single-level codecs such as [XCodec2](https://gi
 - Added support for [FunCodec](https://funcodec.github.io/) from Alibaba DAMO Speech Lab! Use `--codec_model alibaba-damo/...` when encoding audio with `codec_bpe.audio_to_codes` to encode using the FunCodec model. Model paths on the HuggingFace hub are listed [here](https://github.com/modelscope/FunCodec?tab=readme-ov-file#available-models). See [here](#train-a-tokenizer-from-audio-files) for a usage example.
 
 **2024-09-20**
-
 - Added support for Kyutai Lab's [Mimi codec](https://huggingface.co/kyutai/mimi), an amazing new codec with a 12.5 Hz framerate! Use `--codec_model kyutai/mimi` when encoding audio with `codec_bpe.audio_to_codes` to encode using the Mimi model. See [here](#train-a-tokenizer-from-audio-files) for a usage example.
 
 **2024-09-19**
-
 - Initial Release!
 
 ## Setup
@@ -36,20 +40,49 @@ If you want to use the `--codec_type xcodec2` or `--codec_model HKUSTAudio/xcode
 ```bash
 pip install codec-bpe[xcodec2]
 ```
+If you want to use the `--codec_type wavtokenizer` or `--codec_model wavtokenizer-*` options with `codec_bpe.audio_to_codes`, run:
+```bash
+pip install codec-bpe[wavtokenizer]
+# WavTokenizer is not an installable package so you need to clone the repository into your working directory manually:
+cd your/working/dir
+git clone https://github.com/jishengpeng/WavTokenizer.git
+# Note: WavTokenizer requirements are all version pinned and include both training and inference dependencies.
+# I recommend either using a dedicated environment or cherry-picking the requirements you need for inference and installing them manually.
+# For example, I had no issue running inference with latest versions of torch, numpy, and transformers.
+pip install -r WavTokenizer/requirements.txt
+```
+If you want to use the `--codec_type simvq` or `--codec_model simvq_*` options with `codec_bpe.audio_to_codes`, run:
+```bash
+pip install codec-bpe[simvq]
+# SimVQ is not an installable package so you need to clone the repository into your working directory manually:
+cd your/working/dir
+git clone https://github.com/youngsheen/SimVQ.git
+pip install -r SimVQ/requirements.txt
+```
 
 ## Supported Codecs
-| Model                                                               | Sample Rate (kHz)* | Framerate (Hz)* | Max Codebooks | Codebook Size | Max Bandwidth (kbps)* | Training Domain |
-|:--------------------------------------------------------------------|:------------------:|:--------------:|:--------------:|:-------------:|:---------------------:|:---------------:|
-| [🤗 EnCodec 24khz](https://huggingface.co/facebook/encodec_24khz)  | 24                 | 75             | 32             | 1024          | 24                    | General         |
-| [🤗 DAC 44khz](https://huggingface.co/descript/dac_44khz)          | 44.1               | 86.1328125     | 9              | 1024          | 7.8                   | General         |
-| [🤗 DAC 24khz](https://huggingface.co/descript/dac_24khz)          | 24                 | 75             | 32             | 1024          | 24                    | General         |
-| [🤗 DAC 16khz](https://huggingface.co/descript/dac_16khz)          | 16                 | 50             | 12             | 1024          | 6                     | General         |
-| [🤗 Mimi](https://huggingface.co/kyutai/mimi)                      | 24                 | 12.5           | 32             | 2048          | 4.4                   | Speech          |
-| [🤗 XCodec2](https://huggingface.co/HKUSTAudio/xcodec2)            | 16                 | 50             | 1              | 65536         | 0.8                   | Speech          |
-| [🤗 FunCodec zh_en-general-16k-nq32ds640](https://huggingface.co/alibaba-damo/audio_codec-encodec-zh_en-general-16k-nq32ds640-pytorch) | 16 | 25 | 32 | 1024 | 8  | General         |
-| [🤗 FunCodec zh_en-general-16k-nq32ds320](https://huggingface.co/alibaba-damo/audio_codec-encodec-zh_en-general-16k-nq32ds320-pytorch) | 16 | 50 | 32 | 1024 | 16 | General         |
-| [🤗 FunCodec en-libritts-16k-nq32ds640](https://huggingface.co/alibaba-damo/audio_codec-encodec-en-libritts-16k-nq32ds640-pytorch)     | 16 | 25 | 32 | 1024 | 8  | Audiobooks      |
-| [🤗 FunCodec en-libritts-16k-nq32ds320](https://huggingface.co/alibaba-damo/audio_codec-encodec-en-libritts-16k-nq32ds320-pytorch)     | 16 | 50 | 32 | 1024 | 16 | Audiobooks      |
+| Model                                                               | Sample Rate (kHz)* | Framerate (Hz)* | Max Codebooks | Codebook Size | Max Bandwidth (kbps)*     | Training Domain |
+|:--------------------------------------------------------------------|:------------------:|:--------------:|:--------------:|:-------------:|:-------------------------:|:---------------:|
+| [🤗 EnCodec 24khz](https://huggingface.co/facebook/encodec_24khz)  | 24                 | 75             | 32             | 1024          | 24                         | General         |
+| [🤗 DAC 44khz](https://huggingface.co/descript/dac_44khz)          | 44.1               | 86.1328125     | 9              | 1024          | 7.8                        | General         |
+| [🤗 DAC 24khz](https://huggingface.co/descript/dac_24khz)          | 24                 | 75             | 32             | 1024          | 24                         | General         |
+| [🤗 DAC 16khz](https://huggingface.co/descript/dac_16khz)          | 16                 | 50             | 12             | 1024          | 6                          | General         |
+| [🤗 Mimi](https://huggingface.co/kyutai/mimi)                      | 24                 | 12.5           | 32             | 2048          | 4.4                        | Speech          |
+| [🤗 XCodec2](https://huggingface.co/HKUSTAudio/xcodec2)            | 16                 | 50             | 1              | 65536         | 0.8                        | Speech          |
+| [🤗 FunCodec zh_en-general-16k-nq32ds640](https://huggingface.co/alibaba-damo/audio_codec-encodec-zh_en-general-16k-nq32ds640-pytorch) | 16 | 25 | 32 | 1024   | 8     | General         |
+| [🤗 FunCodec zh_en-general-16k-nq32ds320](https://huggingface.co/alibaba-damo/audio_codec-encodec-zh_en-general-16k-nq32ds320-pytorch) | 16 | 50 | 32 | 1024   | 16    | General         |
+| [🤗 FunCodec en-libritts-16k-nq32ds640](https://huggingface.co/alibaba-damo/audio_codec-encodec-en-libritts-16k-nq32ds640-pytorch)     | 16 | 25 | 32 | 1024   | 8     | Audiobooks      |
+| [🤗 FunCodec en-libritts-16k-nq32ds320](https://huggingface.co/alibaba-damo/audio_codec-encodec-en-libritts-16k-nq32ds320-pytorch)     | 16 | 50 | 32 | 1024   | 16    | Audiobooks      |
+| [🤗 WavTokenizer-small-600-24k-4096](https://huggingface.co/novateur/WavTokenizer/blob/main/WavTokenizer_small_600_24k_4096.ckpt)      | 24 | 40 | 1  | 4096   | 0.48  | Speech          |
+| [🤗 WavTokenizer-small-320-24k-4096](https://huggingface.co/novateur/WavTokenizer/blob/main/WavTokenizer_small_320_24k_4096.ckpt)      | 24 | 75 | 1  | 4096   | 0.9   | Speech          |
+| [🤗 WavTokenizer-medium-speech-320-24k-4096](https://huggingface.co/novateur/WavTokenizer-medium-speech-75token)                       | 24 | 75 | 1  | 4096   | 0.9   | Speech          |
+| [🤗 WavTokenizer-medium-music-audio-320-24k-4096](https://huggingface.co/novateur/WavTokenizer-medium-music-audio-75token)             | 24 | 75 | 1  | 4096   | 0.9   | General         |
+| [🤗 WavTokenizer-large-600-24k-4096](https://huggingface.co/novateur/WavTokenizer-large-unify-40token)                                 | 24 | 40 | 1  | 4096   | 0.48  | General         |
+| [🤗 WavTokenizer-large-320-24k-4096](https://huggingface.co/novateur/WavTokenizer-large-speech-75token)                                | 24 | 75 | 1  | 4096   | 0.9   | General         |
+| [🤗 simvq_4k](https://huggingface.co/youngsheen/SimVQ/tree/main/vq_audio_log/simvq_4k)                                                 | 24 | 75 | 1  | 4096   | 0.9   | Speech          |
+| [🤗 simvq_8k](https://huggingface.co/youngsheen/SimVQ/tree/main/vq_audio_log/simvq_8k)                                                 | 24 | 75 | 1  | 8192   | 0.975 | Speech          |
+| [🤗 simvq_65k](https://huggingface.co/youngsheen/SimVQ/tree/main/vq_audio_log/simvq_65k)                                               | 24 | 75 | 1  | 65536  | 1.2   | Speech          |
+| [🤗 simvq_262k](https://huggingface.co/youngsheen/SimVQ/tree/main/vq_audio_log/simvq_262k)                                             | 24 | 75 | 1  | 262144 | 1.35  | Speech          |
 
 \* Sample Rate (kHz) is the sampling rate of the audio input to the codec.
 
@@ -60,7 +93,7 @@ pip install codec-bpe[xcodec2]
 ## Usage
 
 ### Convert audio codes to and from unicode strings
-Use your codec of choice (e.g., EnCodec, DAC, Mimi, XCodec2, FunCodec) to encode your audio into a torch tensor or numpy array of codes of shape (num_codebooks, length), then use the provided converter methods to convert to and from unicode strings.
+Use your codec of choice (e.g., EnCodec, DAC, Mimi, XCodec2, FunCodec, WavTokenizer, SimVQ) to encode your audio into a torch tensor or numpy array of codes of shape (num_codebooks, length), then use the provided converter methods to convert to and from unicode strings.
 
 **Note:** In the Acoustic BPE paper, a single-level codec was used (HuBERT + k-means), where each encoded timestep consisted of a single code which was converted to a single unicode character. Here, we support multi-level codecs based on Residual Vector Quantizers. If num_codebooks > 1, a flattening pattern is used to interleave all codebooks into a single level before mapping to unicode. For example, if 4 codebooks are used then each encoded timestep would consist of 4 codes (one from each codebook) and would be converted to a unicode 4-gram.
 
@@ -118,7 +151,7 @@ sf.write("some_audio_output.wav", audio_2.cpu().numpy(), sr)
 ### Train a tokenizer from audio files
 To train a tokenizer from audio files:
 
-1. Use your codec of choice (e.g., EnCodec, DAC, Mimi, FunCodec) to encode each audio file into a directory of numpy arrays (.npy files):
+1. Use your codec of choice (e.g., EnCodec, DAC, Mimi, XCodec2, FunCodec, WavTokenizer, SimVQ) to encode each audio file into a directory of numpy arrays (.npy files):
     ```bash
     # encode audio files using EnCodec 24 kHz at 3 kbps (4 codebooks)
     python -m codec_bpe.audio_to_codes \
@@ -152,6 +185,18 @@ To train a tokenizer from audio files:
         --audio_path path/to/audio \
         --codec_model alibaba-damo/audio_codec-encodec-zh_en-general-16k-nq32ds640-pytorch \
         --bandwidth 1500 \
+        --batch_size 8
+
+    # encode audio files using WavTokenizer at 0.9 kbps (24kHz -> 75Hz, only 1 codebook of 4096 codes)
+    python -m codec_bpe.audio_to_codes \
+        --audio_path path/to/audio \
+        --codec_model wavtokenizer-large-320-24k-4096 \
+        --batch_size 8
+
+    # encode audio files using SimVQ at 0.9 kbps (24kHz -> 75Hz, only 1 codebook of 4096 codes)
+    python -m codec_bpe.audio_to_codes \
+        --audio_path path/to/audio \
+        --codec_model simvq_4k \
         --batch_size 8
     ```
 

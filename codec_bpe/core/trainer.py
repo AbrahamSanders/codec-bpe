@@ -1,5 +1,5 @@
 from typing import Optional, List, Union, Iterator
-
+import warnings
 import numpy as np
 from tokenizers import AddedToken
 from transformers import PreTrainedTokenizerFast
@@ -114,6 +114,12 @@ class Trainer:
             codes_iterator = []
         else:
             codes_files = get_codes_files(codes_path, codes_filter, num_files)
+            if not self.chunk_size_secs and codes_files[0].split("_")[-1].startswith("c"):
+                warnings.warn(
+                    "The codes files do not have start timestamps, indicating they represent full-length encoded audio files rather than chunks. "
+                    "It is recommended to set `--chunk_size_secs` to a small value (e.g. 30) to avoid the tokenizer training on very long sequences. "
+                    "Training on very long sequences of audio codes can lead to memory issues and poor BPE merges."
+                )
             codes_iterator = self._iterate_and_convert(codes_files)
             # the +1 is because max_token_length is exclusive (e.g., max_token_length of n yields an actual max token length of n-1).
             # not sure if this is a bug in Tokenizers or intended behavior.

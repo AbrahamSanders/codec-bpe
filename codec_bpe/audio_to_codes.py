@@ -21,7 +21,21 @@ if __name__ == "__main__":
         help="Directory to save the numpy codes files",
     )
     parser.add_argument(
-        "--chunk_size_secs", type=int, default=60, help="Chunk size in seconds"
+        "--chunk_size_secs", 
+        type=float, 
+        default=30.0, help="Chunk size in seconds",
+    )
+    parser.add_argument(
+        "--context_secs", 
+        type=float, 
+        default=0.0, 
+        help=(
+            "Context size in seconds for encoding (default: 0.0, no context). "
+            "If set, chunks will be left-padded with max(0, context_secs-chunk_size_secs) "
+            "seconds of previous audio, while only chunk_size_secs worth of codes will be saved. "
+            "This is useful for codecs that require context for better encoding quality at "
+            "very small chunk sizes."
+        ),
     )
     parser.add_argument(
         "--batch_size",
@@ -70,6 +84,15 @@ if __name__ == "__main__":
         help="Encode stereo audio channels separately instead of converting to mono",
     )
     parser.add_argument(
+        "--file_per_chunk",
+        action="store_true",
+        help=(
+            "Save each audio chunk as a separate numpy file with the start timestamp (secs) in the filename "
+            "instead of the default behavior of concatenating all chunks into a single numpy file corresponding "
+            "to the original audio file."
+        ),
+    )
+    parser.add_argument(
         "--extensions",
         nargs="+",
         default=SUPPORTED_EXTENSIONS,
@@ -98,18 +121,21 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     codec_name_for_path = args.codec_model.split("/")[-1]
+    codec_setting_for_path = f"{args.chunk_size_secs}s_{args.context_secs}s"
     args.codes_path = os.path.join(
-        args.codes_path, codec_name_for_path, "stereo" if args.stereo else "mono"
+        args.codes_path, codec_name_for_path, codec_setting_for_path, "stereo" if args.stereo else "mono"
     )
 
     audio_encoder = AudioEncoder(
         args.codec_model,
         codec_type=args.codec_type,
         chunk_size_secs=args.chunk_size_secs,
+        context_secs=args.context_secs,
         batch_size=args.batch_size,
         bandwidth=args.bandwidth,
         n_quantizers=args.n_quantizers,
         stereo=args.stereo,
+        file_per_chunk=args.file_per_chunk,
     )
 
     codec_info = audio_encoder.get_codec_info()

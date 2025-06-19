@@ -2,6 +2,7 @@ from typing import Optional, Union, Iterator, List
 from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 from tqdm import tqdm
 import numpy as np
+import re
 
 from ..core.converter import codes_to_chars, validate_unicode_offset, UNICODE_OFFSET
 from ..core.utils import get_codes_files
@@ -42,7 +43,7 @@ class LMDatasetBuilder:
         grouped_codes_files = []
         last_file_root = None
         for codes_file in codes_files:
-            file_root = "_".join(codes_file.split("_")[:-2])
+            file_root = re.match(r"(.+)_c\d+[_.]", codes_file).group(1)
             if file_root != last_file_root:
                 grouped_codes_files.append([])
                 last_file_root = file_root

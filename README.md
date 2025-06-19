@@ -10,6 +10,12 @@ Codec BPE can also be used with single-level codecs such as [XCodec2](https://gi
 **Using Codec BPE allows efficient audio language modeling with multi-level codecs to be done with vanilla LLM architectures, meaning no custom architecture is needed to deal with modeling the RVQ. Your model will already be compatible with the full ecosystem of training and inference tools available for [HuggingFace Transformers](https://github.com/huggingface/transformers), such as [vLLM](https://github.com/vllm-project/vllm) and [Ollama](https://ollama.com/)!**
 
 ## 🚀 Updates
+**2025-06-19**
+- Added ability to encode audio into subsecond chunk sizes with a sliding window of prior audio as context. This helps support use-cases where the encoded audio should simulate a streaming setting. For example, many codecs will encode the same audio differently depending on the encoder's receptive field size - even with native streaming codecs like Mimi. So, when training a streaming speech-to-text audio LM, we want to encode the training audio in tiny chunks so that it resembles what will be received during live streaming. This helps prevent throwing the model out of distribution at inference time.
+  - Use the `--chunk_size_secs` and `--context_secs` parameters with `codec_bpe.audio_to_codes` to configure this.
+  - By default `--chunk_size_secs=30` and `--context_secs=0.0` for non-streaming usage. 
+  - `--context_secs` controls the sliding window encoding size, which is useful to avoid codec degradation at tiny chunk sizes. For example, `--chunk_size_secs=0.08` with `--context_secs=0.4` will encode audio in chunks of 80ms, each chunk receiving the previous 320ms of audio as context to the encoder's receptive field (we encode 320 + 80 = 400ms of audio at a time but only keep the final 80ms of codes).
+
 **2025-06-16**
 - Added support for [WavTokenizer](https://github.com/jishengpeng/WavTokenizer) and [SimVQ](https://github.com/youngsheen/SimVQ)! Both are single-level codecs that share the same architecture but differ in their VQ strategy. WavTokenizer comes in 40Hz and 75Hz variants with a vocabulary size of 4096. SimVQ variants have a 75Hz framerate with vocabulary sizes ranging from 4096 to 262144 codes. SimVQ also features a causal encoder and partially causal decoder, making it suitable for streaming use cases. 
   - Use `--codec_model WavTokenizer-large-320-24k-4096` (or any other from the `Model` column on [this table](#supported-codecs)) with `codec_bpe.audio_to_codes` to encode audio using WavTokenizer.
@@ -198,12 +204,20 @@ To train a tokenizer from audio files:
         --audio_path path/to/audio \
         --codec_model simvq_4k \
         --batch_size 8
+
+    # encode audio files using SimVQ at 0.9 kbps in tiny chunks of 80ms with a 400ms context to simulate streaming encoding
+    python -m codec_bpe.audio_to_codes \
+        --audio_path path/to/audio \
+        --codec_model simvq_4k \
+        --batch_size 128 \
+        --chunk_size_secs 0.08 \
+        --context_secs 0.4
     ```
 
 2. Suppose you want to use the first 4 codebooks of [EnCodec 24 kHz](https://huggingface.co/facebook/encodec_24khz), run:
     ```bash
     python -m codec_bpe.train_tokenizer \
-        --codes_path output/codes/encodec_24khz/mono \
+        --codes_path output/codes/encodec_24khz/30.0s_0.0s/mono \
         --chunk_size_secs 30 \
         --vocab_size 30000 \
         --pad_token "<pad>"
@@ -220,7 +234,7 @@ To train a tokenizer from audio files:
     You may also pass these arguments explicitly. For example:
     ```bash
     python -m codec_bpe.train_tokenizer \
-        --codes_path output/codes/encodec_24khz/mono \
+        --codes_path output/codes/encodec_24khz/30.0s_0.0s/mono \
         --num_codebooks 4 \
         --codebook_size 1024 \
         --codec_framerate 75 \
@@ -239,7 +253,7 @@ The `max_token_codebook_ngrams` argument can be used to control how many codes c
 To avoid this, you can set `max_token_codebook_ngrams` to the maximum number of codebook ngrams (whole acoustic units) you want to allow a single token to represent. For example, if you set `max_token_codebook_ngrams = 2` while `num_codebooks` is set to 4, then a single Codec BPE token may only hold up to 8 codes:
 ```bash
 python -m codec_bpe.train_tokenizer \
-    --codes_path output/codes/encodec_24khz/mono \
+    --codes_path output/codes/encodec_24khz/30.0s_0.0s/mono \
     --chunk_size_secs 30 \
     --vocab_size 30000 \
     --pad_token "<pad>" \
@@ -252,7 +266,7 @@ python -m codec_bpe.train_tokenizer \
 If you are using a codec with a very large codebook size (e.g. XCodec2, which has a codebook size of 65536), you may need to adjust the `unicode_offset` argument for `codec_bpe.train_tokenizer` to avoid the non-printable surrogate range 0xD800-0xDFFF:
 ```bash
 python -m codec_bpe.train_tokenizer \
-    --codes_path output/codes/xcodec2/mono \
+    --codes_path output/codes/xcodec2/30.0s_0.0s/mono \
     --chunk_size_secs 30 \
     --vocab_size 80000 \
     --pad_token "<pad>" \

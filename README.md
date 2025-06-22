@@ -5,11 +5,14 @@ Codec BPE is an implementation of [Acoustic BPE](https://arxiv.org/abs/2310.1458
 
 Codec BPE flattens multi-level codes from Residual Vector Quantizers (RVQ) and converts them into unicode strings for tokenization into compressed token sequences. For example, a single Codec BPE token might represent a 4-gram of codes from 4 codebooks representing a single acoustic unit, a 6-gram comprising a whole acoustic unit and half of the next one, or even an 8-gram represnting two whole acoustic units. Depending on the codec, vocab size and type of audio, this can yield savings of 2-5x in sequence length compared to directly modeling the flattened codebooks.
 
-Codec BPE can also be used with single-level codecs such as [XCodec2](https://github.com/zhenye234/X-Codec-2.0) (Ye et al., 2025), [WavTokenizer](https://github.com/jishengpeng/WavTokenizer) (Ji et al., 2024), and [SimVQ](https://github.com/youngsheen/SimVQ) (Zhu et al., 2024). In this case, a single Codec BPE token could represent one or more codes where each code represents a whole acoustic unit.
+Codec BPE can also be used with single-level codecs such as [XCodec2](https://github.com/zhenye234/X-Codec-2.0) (Ye et al., 2025), [WavTokenizer](https://github.com/jishengpeng/WavTokenizer) (Ji et al., 2024), [SimVQ](https://github.com/youngsheen/SimVQ) (Zhu et al., 2024), and [MagiCodec](https://github.com/Ereboas/MagiCodec) (Song et al., 2025). In this case, a single Codec BPE token could represent one or more codes where each code represents a whole acoustic unit.
 
 **Using Codec BPE allows efficient audio language modeling with multi-level codecs to be done with vanilla LLM architectures, meaning no custom architecture is needed to deal with modeling the RVQ. Your model will already be compatible with the full ecosystem of training and inference tools available for [HuggingFace Transformers](https://github.com/huggingface/transformers), such as [vLLM](https://github.com/vllm-project/vllm) and [Ollama](https://ollama.com/)!**
 
 ## 🚀 Updates
+**2025-06-22**
+- Added support for [MagiCodec](https://github.com/Ereboas/MagiCodec), a new **streaming** single-level codec with a 50 Hz framerate! Use `--codec_model MagiCodec-50Hz-Base` when encoding audio with `codec_bpe.audio_to_codes` to encode using the MagiCodec model. See [here](#train-a-tokenizer-from-audio-files) for a usage example.
+
 **2025-06-19**
 - Added ability to encode audio into subsecond chunk sizes with a sliding window of prior audio as context. This helps support use-cases where the encoded audio should simulate a streaming setting. For example, many codecs will encode the same audio differently depending on the encoder's receptive field size - even with native streaming codecs like Mimi. So, when training a streaming speech-to-text audio LM, we want to encode the training audio in tiny chunks so that it resembles what will be received during live streaming. This helps prevent throwing the model out of distribution at inference time.
   - Use the `--chunk_size_secs` and `--context_secs` parameters with `codec_bpe.audio_to_codes` to configure this.
@@ -65,6 +68,15 @@ cd your/working/dir
 git clone https://github.com/youngsheen/SimVQ.git
 pip install -r SimVQ/requirements.txt
 ```
+If you want to use the `--codec_type magicodec` or `--codec_model MagiCodec-50Hz-Base` options with `codec_bpe.audio_to_codes`, run:
+```bash
+pip install codec-bpe[magicodec]
+# MagiCodec is not an installable package so you need to clone the repository into your working directory manually:
+cd your/working/dir
+git clone https://github.com/Ereboas/MagiCodec.git
+cd MagiCodec
+# Follow setup instructions for MagiCodec [here](https://github.com/Ereboas/MagiCodec#env-setup)
+```
 
 ## Supported Codecs
 | Model                                                               | Sample Rate (kHz)* | Framerate (Hz)* | Max Codebooks | Codebook Size | Max Bandwidth (kbps)*     | Training Domain |
@@ -89,6 +101,7 @@ pip install -r SimVQ/requirements.txt
 | [🤗 simvq_8k](https://huggingface.co/youngsheen/SimVQ/tree/main/vq_audio_log/simvq_8k)                                                 | 24 | 75 | 1  | 8192   | 0.975 | Speech          |
 | [🤗 simvq_65k](https://huggingface.co/youngsheen/SimVQ/tree/main/vq_audio_log/simvq_65k)                                               | 24 | 75 | 1  | 65536  | 1.2   | Speech          |
 | [🤗 simvq_262k](https://huggingface.co/youngsheen/SimVQ/tree/main/vq_audio_log/simvq_262k)                                             | 24 | 75 | 1  | 262144 | 1.35  | Speech          |
+| [🤗 MagiCodec-50Hz-Base](https://huggingface.co/Ereboas/MagiCodec_16k_50hz)                                                            | 16 | 50 | 1  | 131072 | 0.85  | Audiobooks      |
 
 \* Sample Rate (kHz) is the sampling rate of the audio input to the codec.
 
@@ -212,6 +225,20 @@ To train a tokenizer from audio files:
         --batch_size 128 \
         --chunk_size_secs 0.08 \
         --context_secs 0.4
+
+    # encode audio files using MagiCodec at 0.85 kbps (16kHz -> 50Hz, only 1 codebook of 131072 codes)
+    python -m codec_bpe.audio_to_codes \
+        --audio_path path/to/audio \
+        --codec_model MagiCodec-50Hz-Base \
+        --batch_size 8
+
+    # encode audio files using MagiCodec at 0.85 kbps in tiny chunks of 80ms with a 1s context to simulate streaming encoding
+    python -m codec_bpe.audio_to_codes \
+        --audio_path path/to/audio \
+        --codec_model MagiCodec-50Hz-Base \
+        --batch_size 128 \
+        --chunk_size_secs 0.08 \
+        --context_secs 1.0
     ```
 
 2. Suppose you want to use the first 4 codebooks of [EnCodec 24 kHz](https://huggingface.co/facebook/encodec_24khz), run:

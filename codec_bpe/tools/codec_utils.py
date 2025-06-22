@@ -6,6 +6,15 @@ from enum import Enum
 from typing import Tuple, Union, List
 from transformers.feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 
+MAGICODEC_MODELS = {
+    "magicodec-50hz-base": {
+        "ckpt": {
+            "repo_id": "Ereboas/MagiCodec_16k_50hz",
+            "filename": "MagiCodec-50Hz-Base.ckpt",
+        },
+    },
+}
+
 WAVTOKENIZER_MODELS = {
     "wavtokenizer-small-600-24k-4096": {
         "config": {
@@ -79,6 +88,7 @@ class CodecTypes(Enum):
     XCODEC2 = "xcodec2"
     WAVTOKENIZER = "wavtokenizer"
     SIMVQ = "simvq"
+    MAGICODEC = "magicodec"
 
     @classmethod
     def try_get_codec_type(cls, codec_model):
@@ -97,6 +107,8 @@ class CodecTypes(Enum):
             return cls.WAVTOKENIZER
         if "simvq" in codec_model:
             return cls.SIMVQ
+        if "magicodec" in codec_model:
+            return cls.MAGICODEC
         raise ValueError(f"Could not infer codec type from codec model: {codec_model}. Please specify --codec_type.")
 
     def __str__(self):
@@ -196,6 +208,30 @@ def load_simvq_model(codec_model: str, device: Union[str, torch.device]) -> Tupl
     sr = config.model.init_args.sample_rate
     return model, processor, sr
 
+def load_magicodec_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int]:
+    # add `MagiCodec` directory to the import path.
+    # TODO: get rid of this if a proper MagiCodec package is ever released.
+    if not os.path.exists("MagiCodec"):
+        raise ValueError(
+            "MagiCodec not found in your working directory. Please clone the MagiCodec repository: "
+            "`git clone https://github.com/Ereboas/MagiCodec.git`"
+        )
+    import sys
+    sys.path.append("MagiCodec")
+    from huggingface_hub import hf_hub_download
+    from codec.generator import Generator
+    if codec_model.lower() not in MAGICODEC_MODELS:
+        raise ValueError(f"Unsupported magicodec model: {codec_model}. Supported models: {list(MAGICODEC_MODELS)}")
+    model_info = MAGICODEC_MODELS[codec_model.lower()]
+    model_ckpt = hf_hub_download(**model_info["ckpt"])
+    model = Generator(token_hz=50)
+    state_dict = torch.load(model_ckpt, map_location='cpu')
+    model.load_state_dict(state_dict, strict=False)
+    model = model.eval().to(device)
+    processor = DefaultProcessor()
+    sr = model.sample_rate
+    return model, processor, sr
+
 def load_transformers_codec_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, FeatureExtractionMixin, int]:
     from transformers import AutoModel, AutoProcessor
     model = AutoModel.from_pretrained(codec_model).to(device)
@@ -216,5 +252,7 @@ def load_codec_model(
         return load_wavtokenizer_model(codec_model, device)
     elif codec_type == CodecTypes.SIMVQ:
         return load_simvq_model(codec_model, device)
+    elif codec_type == CodecTypes.MAGICODEC:
+        return load_magicodec_model(codec_model, device)
     else:
         return load_transformers_codec_model(codec_model, device)

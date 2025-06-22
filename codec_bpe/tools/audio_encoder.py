@@ -39,6 +39,8 @@ class AudioEncoder:
         self.device = device
         if self.device is None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        elif isinstance(self.device, str):
+            self.device = torch.device(self.device)
         self.chunk_size_secs = chunk_size_secs
         self.context_secs = context_secs
         self.batch_size = batch_size
@@ -87,6 +89,16 @@ class AudioEncoder:
             elif self.codec_type == CodecTypes.SIMVQ:
                 _, _, audio_codes, _ = self.model.encode(input_values)
                 audio_codes = audio_codes.view(input_values.shape[0], 1, -1)
+            elif self.codec_type == CodecTypes.MAGICODEC:
+                with torch.autocast(
+                    device_type = "cuda",
+                    dtype = torch.bfloat16,
+                    enabled = self.device.type == "cuda" and torch.cuda.is_bf16_supported(),
+                ):
+                    x = self.model.pad_audio(input_values)
+                    z_e = self.model.encoder(x)
+                    _, audio_codes = self.model.quantizer.inference(z_e)
+                audio_codes = audio_codes.unsqueeze(1)
             else:
                 encode_kwargs = {}
                 if self.codec_type == CodecTypes.DAC:
@@ -238,6 +250,8 @@ class AudioEncoder:
             codebook_size = self.model.feature_extractor.encodec.quantizer.bins
         elif self.codec_type == CodecTypes.SIMVQ:
             codebook_size = self.model.quantize.n_e
+        elif self.codec_type == CodecTypes.MAGICODEC:
+            codebook_size = self.model.codebook_size
         else:
             codebook_size = self.model.config.codebook_size
 

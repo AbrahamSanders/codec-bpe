@@ -37,5 +37,6 @@ setup(
         "xcodec2": read_requirements("requirements_xcodec2.txt"),
         "wavtokenizer": read_requirements("requirements_wavtokenizer.txt"),
         "simvq": read_requirements("requirements_simvq.txt"),
+        "magicodec": read_requirements("requirements_magicodec.txt"),
     },
 )

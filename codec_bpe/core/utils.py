@@ -8,21 +8,29 @@ def get_codes_files(
     codes_filter: Optional[Union[str, List[str]]] = None, 
     num_files: Optional[int] = None,
 ) -> List[str]:
-    if isinstance(codes_filter, str):
-        codes_filter = [codes_filter]
-    codes_files = []
-    for root, _, files in os.walk(codes_path):
+    return get_files(codes_path, ".npy", codes_filter, num_files)
+
+def get_files(
+    path: str, 
+    extension: str,
+    filter: Optional[Union[str, List[str]]] = None, 
+    num_files: Optional[int] = None,
+) -> List[str]:
+    if isinstance(filter, str):
+        filter = [filter]
+    result_files = []
+    for root, _, files in os.walk(path):
         for file in files:
             file_path = os.path.join(root, file)
-            if not file_path.endswith(".npy"):
+            if not file_path.endswith(extension):
                 continue
-            if codes_filter and not any([f in file_path for f in codes_filter]):
+            if filter and not any([f in file_path for f in filter]):
                 continue
-            codes_files.append(file_path)
-    codes_files.sort()
+            result_files.append(file_path)
+    result_files.sort()
     if num_files is not None:
-        codes_files = codes_files[:num_files]
-    return codes_files
+        result_files = result_files[:num_files]
+    return result_files
 
 def get_codec_info(codes_path: str) -> dict:
     codec_info_file = os.path.join(codes_path, "codec_info.json")

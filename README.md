@@ -5,37 +5,19 @@ Codec BPE is an implementation of [Acoustic BPE](https://arxiv.org/abs/2310.1458
 
 Codec BPE flattens multi-level codes from Residual Vector Quantizers (RVQ) and converts them into unicode strings for tokenization into compressed token sequences. For example, a single Codec BPE token might represent a 4-gram of codes from 4 codebooks representing a single acoustic unit, a 6-gram comprising a whole acoustic unit and half of the next one, or even an 8-gram represnting two whole acoustic units. Depending on the codec, vocab size and type of audio, this can yield savings of 2-5x in sequence length compared to directly modeling the flattened codebooks.
 
-Codec BPE can also be used with single-level codecs such as [XCodec2](https://github.com/zhenye234/X-Codec-2.0) (Ye et al., 2025), [WavTokenizer](https://github.com/jishengpeng/WavTokenizer) (Ji et al., 2024), [SimVQ](https://github.com/youngsheen/SimVQ) (Zhu et al., 2024), and [MagiCodec](https://github.com/Ereboas/MagiCodec) (Song et al., 2025). In this case, a single Codec BPE token could represent one or more codes where each code represents a whole acoustic unit.
+Codec BPE can also be used with single-level codecs such as [XCodec2](https://github.com/zhenye234/X-Codec-2.0) (Ye et al., 2025), [WavTokenizer](https://github.com/jishengpeng/WavTokenizer) (Ji et al., 2024), [SimVQ](https://github.com/youngsheen/SimVQ) (Zhu et al., 2024), [MagiCodec](https://github.com/Ereboas/MagiCodec) (Song et al., 2025), and [NeuCodec](https://github.com/neuphonic/neucodec) (Julian et al., 2025). In this case, a single Codec BPE token could represent one or more codes where each code represents a whole acoustic unit.
 
 **Using Codec BPE allows efficient audio language modeling with multi-level codecs to be done with vanilla LLM architectures, meaning no custom architecture is needed to deal with modeling the RVQ. Your model will already be compatible with the full ecosystem of training and inference tools available for [HuggingFace Transformers](https://github.com/huggingface/transformers), such as [vLLM](https://github.com/vllm-project/vllm) and [Ollama](https://ollama.com/)!**
 
 ## 🚀 Updates
+**2025-12-01**
+- Added support for [NeuCodec](https://huggingface.co/neuphonic/neucodec), a new high-quality single-level codec with a 50 Hz framerate! NeuCodec extends XCodec2 with inference speedups, an upsampling decoder, and a commercially permissive license. Use `--codec_model neuphonic/neucodec` when encoding audio with `codec_bpe.audio_to_codes` to encode using the NeuCodec model. See [here](#train-a-tokenizer-from-audio-files) for a usage example.
+
 **2025-06-22**
 - Added support for [MagiCodec](https://github.com/Ereboas/MagiCodec), a new **streaming** single-level codec with a 50 Hz framerate! Use `--codec_model MagiCodec-50Hz-Base` when encoding audio with `codec_bpe.audio_to_codes` to encode using the MagiCodec model. See [here](#train-a-tokenizer-from-audio-files) for a usage example.
 
-**2025-06-19**
-- Added ability to encode audio into subsecond chunk sizes with a sliding window of prior audio as context. This helps support use-cases where the encoded audio should simulate a streaming setting. For example, many codecs will encode the same audio differently depending on the encoder's receptive field size - even with native streaming codecs like Mimi. So, when training a streaming speech-to-text audio LM, we want to encode the training audio in tiny chunks so that it resembles what will be received during live streaming. This helps prevent throwing the model out of distribution at inference time.
-  - Use the `--chunk_size_secs` and `--context_secs` parameters with `codec_bpe.audio_to_codes` to configure this.
-  - By default `--chunk_size_secs=30` and `--context_secs=0.0` for non-streaming usage. 
-  - `--context_secs` controls the sliding window encoding size, which is useful to avoid codec degradation at tiny chunk sizes. For example, `--chunk_size_secs=0.08` with `--context_secs=0.4` will encode audio in chunks of 80ms, each chunk receiving the previous 320ms of audio as context to the encoder's receptive field (we encode 320 + 80 = 400ms of audio at a time but only keep the final 80ms of codes).
-
-**2025-06-16**
-- Added support for [WavTokenizer](https://github.com/jishengpeng/WavTokenizer) and [SimVQ](https://github.com/youngsheen/SimVQ)! Both are single-level codecs that share the same architecture but differ in their VQ strategy. WavTokenizer comes in 40Hz and 75Hz variants with a vocabulary size of 4096. SimVQ variants have a 75Hz framerate with vocabulary sizes ranging from 4096 to 262144 codes. SimVQ also features a causal encoder and partially causal decoder, making it suitable for streaming use cases. 
-  - Use `--codec_model WavTokenizer-large-320-24k-4096` (or any other from the `Model` column on [this table](#supported-codecs)) with `codec_bpe.audio_to_codes` to encode audio using WavTokenizer.
-  - Use `--codec_model simvq_4k` (or any other from the `Model` column on [this table](#supported-codecs)) with `codec_bpe.audio_to_codes` to encode audio using SimVQ.
-  - See [here](#train-a-tokenizer-from-audio-files) for usage examples.
-
-**2025-04-07**
-- Added support for [XCodec2](https://huggingface.co/HKUSTAudio/xcodec2), a high-quality multilingual single-level codec with a 50 Hz framerate! Use `--codec_model HKUSTAudio/xcodec2` when encoding audio with `codec_bpe.audio_to_codes` to encode using the XCodec2 model. See [here](#train-a-tokenizer-from-audio-files) for a usage example.
-
-**2025-03-09**
-- Added support for [FunCodec](https://funcodec.github.io/) from Alibaba DAMO Speech Lab! Use `--codec_model alibaba-damo/...` when encoding audio with `codec_bpe.audio_to_codes` to encode using the FunCodec model. Model paths on the HuggingFace hub are listed [here](https://github.com/modelscope/FunCodec?tab=readme-ov-file#available-models). See [here](#train-a-tokenizer-from-audio-files) for a usage example.
-
-**2024-09-20**
-- Added support for Kyutai Lab's [Mimi codec](https://huggingface.co/kyutai/mimi), an amazing new codec with a 12.5 Hz framerate! Use `--codec_model kyutai/mimi` when encoding audio with `codec_bpe.audio_to_codes` to encode using the Mimi model. See [here](#train-a-tokenizer-from-audio-files) for a usage example.
-
-**2024-09-19**
-- Initial Release!
+**Older updates**
+- See [CHANGELOG.md](CHANGELOG.md) for a complete list of updates.
 
 ## Setup
 ```bash
@@ -77,6 +59,10 @@ git clone https://github.com/Ereboas/MagiCodec.git
 cd MagiCodec
 # Follow setup instructions for MagiCodec [here](https://github.com/Ereboas/MagiCodec#env-setup)
 ```
+If you want to use the `--codec_type neucodec` or `--codec_model neuphonic/neucodec` options with `codec_bpe.audio_to_codes`, run:
+```bash
+pip install codec-bpe[neucodec]
+```
 
 ## Supported Codecs
 | Model                                                               | Sample Rate (kHz)* | Framerate (Hz)* | Max Codebooks | Codebook Size | Max Bandwidth (kbps)*     | Training Domain |
@@ -102,6 +88,8 @@ cd MagiCodec
 | [🤗 simvq_65k](https://huggingface.co/youngsheen/SimVQ/tree/main/vq_audio_log/simvq_65k)                                               | 24 | 75 | 1  | 65536  | 1.2   | Speech          |
 | [🤗 simvq_262k](https://huggingface.co/youngsheen/SimVQ/tree/main/vq_audio_log/simvq_262k)                                             | 24 | 75 | 1  | 262144 | 1.35  | Speech          |
 | [🤗 MagiCodec-50Hz-Base](https://huggingface.co/Ereboas/MagiCodec_16k_50hz)                                                            | 16 | 50 | 1  | 131072 | 0.85  | Audiobooks      |
+| [🤗 NeuCodec](https://huggingface.co/neuphonic/neucodec)                                                                               | 16 | 50 | 1  | 65536  | 0.8   | Speech          |
+| [🤗 Distill-NeuCodec](https://huggingface.co/neuphonic/distill-neucodec)                                                               | 16 | 50 | 1  | 65536  | 0.8   | Speech          |
 
 \* Sample Rate (kHz) is the sampling rate of the audio input to the codec.
 
@@ -239,6 +227,12 @@ To train a tokenizer from audio files:
         --batch_size 128 \
         --chunk_size_secs 0.08 \
         --context_secs 1.0
+
+    # encode audio files using NeuCodec at 0.8 kbps (16kHz -> 50Hz, only 1 codebook of 65536 codes)
+    python -m codec_bpe.audio_to_codes \
+        --audio_path path/to/audio \
+        --codec_model neuphonic/neucodec \
+        --batch_size 1 # NeuCodec only supports batch size 1 for now.
     ```
 
 2. Suppose you want to use the first 4 codebooks of [EnCodec 24 kHz](https://huggingface.co/facebook/encodec_24khz), run:

@@ -44,8 +44,8 @@ class AudioEncoder:
         self.chunk_size_secs = chunk_size_secs
         self.context_secs = context_secs
         self.batch_size = batch_size
-        if self.batch_size > 1 and self.codec_type == CodecTypes.XCODEC2:
-            raise ValueError("XCodec2 only supports batch size 1 for now.")
+        if self.batch_size > 1 and self.codec_type in [CodecTypes.XCODEC2, CodecTypes.NEUCODEC]:
+            raise ValueError("XCodec2 and NeuCodec only support batch size 1 for now.")
         self.bandwidth = bandwidth
         # support bandwidth in kbps or bps
         if self.bandwidth is not None:
@@ -58,13 +58,15 @@ class AudioEncoder:
         self.file_per_chunk = file_per_chunk
 
         # load the codec model
-        self.model, self.processor, self.sr = load_codec_model(self.codec_type, self.codec_model, self.device)
-        self.chunk_size_samples = int(self.chunk_size_secs * self.sr)
-        self.context_samples = int(max(0.0, self.context_secs-self.chunk_size_secs) * self.sr)
+        self.model, self.processor, self.sr_enc, self.sr_dec = load_codec_model(self.codec_type, self.codec_model, self.device)
+        self.chunk_size_samples = int(self.chunk_size_secs * self.sr_enc)
+        self.context_samples = int(max(0.0, self.context_secs-self.chunk_size_secs) * self.sr_enc)
 
     def _encode_batch(self, batch: List[np.ndarray]) -> Tuple[torch.Tensor, float]:
         # Process audio to get padded input tensor
-        inputs = self.processor(raw_audio=batch, sampling_rate=self.sr, return_tensors="pt").to(self.device)
+        inputs = self.processor(raw_audio=batch, sampling_rate=self.sr_enc, return_tensors="pt")
+        if self.codec_type != CodecTypes.NEUCODEC:
+            inputs = inputs.to(self.device)
         input_values = inputs.input_values
 
         # Encode the batch
@@ -79,7 +81,7 @@ class AudioEncoder:
                 audio_codes = torch.permute(encoded_batch[0], (1, 0, 2))
             elif self.codec_type == CodecTypes.XCODEC2:
                 input_values = input_values.squeeze(1)
-                audio_codes = self.model.encode_code(input_values, sample_rate=self.sr)
+                audio_codes = self.model.encode_code(input_values, sample_rate=self.sr_enc)
             elif self.codec_type == CodecTypes.WAVTOKENIZER:
                 input_values = input_values.squeeze(1)
                 bandwidth_id = torch.tensor([0]).to(self.device)
@@ -99,6 +101,8 @@ class AudioEncoder:
                     z_e = self.model.encoder(x)
                     _, audio_codes = self.model.quantizer.inference(z_e)
                 audio_codes = audio_codes.unsqueeze(1)
+            elif self.codec_type == CodecTypes.NEUCODEC:
+                audio_codes = self.model.encode_code(input_values)
             else:
                 encode_kwargs = {}
                 if self.codec_type == CodecTypes.DAC:
@@ -194,7 +198,7 @@ class AudioEncoder:
                 result.num_audio_files += 1
                 try:
                     # Load the audio file
-                    audio, _ = librosa.load(file_path, sr=self.sr, mono=not self.stereo)
+                    audio, _ = librosa.load(file_path, sr=self.sr_enc, mono=not self.stereo)
                 except Exception as e:
                     print(f"Error loading {file_path}: {e}")
                     result.errored_audio_files.append(file_path)
@@ -214,7 +218,7 @@ class AudioEncoder:
                         audio_chunk = np.pad(audio_chunk, ((0, 0), (-start_with_context, 0)), mode='constant')
                     for channel in range(audio_chunk.shape[0]):
                         batch.append(audio_chunk[channel])
-                        batch_info.append((file_path, numpy_root, channel, start / self.sr, end_of_file))
+                        batch_info.append((file_path, numpy_root, channel, start / self.sr_enc, end_of_file))
                         
                         # Process batch if it reaches the specified size
                         if len(batch) == self.batch_size:
@@ -239,7 +243,7 @@ class AudioEncoder:
 
     def get_codec_info(self) -> Dict[str, Union[str, int, float]]:
         # encode ten seconds of audio and get the number of codebooks and framerate
-        dummy_audio = np.zeros(10 * self.sr)
+        dummy_audio = np.zeros(10 * self.sr_enc)
         audio_codes, samples_per_frame = self._encode_batch([dummy_audio])
         # get stats
         if self.codec_type == CodecTypes.FUNCODEC:
@@ -252,6 +256,8 @@ class AudioEncoder:
             codebook_size = self.model.quantize.n_e
         elif self.codec_type == CodecTypes.MAGICODEC:
             codebook_size = self.model.codebook_size
+        elif self.codec_type == CodecTypes.NEUCODEC:
+            codebook_size = 65536
         else:
             codebook_size = self.model.config.codebook_size
 
@@ -259,9 +265,10 @@ class AudioEncoder:
         codec_info = {
             "codec_type": str(self.codec_type),
             "codec_model": self.codec_model,
-            "sampling_rate": self.sr,
+            "sampling_rate_encoder": self.sr_enc,
+            "sampling_rate_decoder": self.sr_dec,
             "num_codebooks": audio_codes.shape[-2],
             "codebook_size": codebook_size,
-            "framerate": self.sr / samples_per_frame,
+            "framerate": self.sr_enc / samples_per_frame,
         }
         return codec_info

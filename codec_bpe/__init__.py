@@ -5,4 +5,4 @@ from .core.converter import (
     UNICODE_OFFSET_LARGE,
 )
 
-__version__ = "1.3.8"
+__version__ = "1.4.0"

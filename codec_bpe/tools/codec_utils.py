@@ -89,6 +89,7 @@ class CodecTypes(Enum):
     WAVTOKENIZER = "wavtokenizer"
     SIMVQ = "simvq"
     MAGICODEC = "magicodec"
+    NEUCODEC = "neucodec"
 
     @classmethod
     def try_get_codec_type(cls, codec_model):
@@ -109,6 +110,8 @@ class CodecTypes(Enum):
             return cls.SIMVQ
         if "magicodec" in codec_model:
             return cls.MAGICODEC
+        if "neucodec" in codec_model:
+            return cls.NEUCODEC
         raise ValueError(f"Could not infer codec type from codec model: {codec_model}. Please specify --codec_type.")
 
     def __str__(self):
@@ -129,7 +132,7 @@ class DefaultProcessor:
         )
         return inputs
 
-def load_funcodec_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int]:
+def load_funcodec_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int, int]:
     from funcodec.bin.codec_inference import Speech2Token
     from huggingface_hub import snapshot_download
     cache_path = snapshot_download(codec_model)
@@ -138,10 +141,10 @@ def load_funcodec_model(codec_model: str, device: Union[str, torch.device]) -> T
     model = Speech2Token(config_file, model_pth, device=str(device))
     model.eval()
     processor = DefaultProcessor()
-    sr = model.model_args.sampling_rate
-    return model, processor, sr
+    sr_enc, sr_dec = model.model_args.sampling_rate
+    return model, processor, sr_enc, sr_dec
 
-def load_xcodec2_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int]:
+def load_xcodec2_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int, int]:
     from huggingface_hub import hf_hub_download
     from xcodec2.modeling_xcodec2 import XCodec2Model
     from xcodec2.configuration_bigcodec import BigCodecConfig
@@ -155,10 +158,10 @@ def load_xcodec2_model(codec_model: str, device: Union[str, torch.device]) -> Tu
     model = XCodec2Model.from_pretrained(None, config=codec_config, state_dict=ckpt)
     model = model.eval().to(device)
     processor = DefaultProcessor()
-    sr = model.feature_extractor.sampling_rate
-    return model, processor, sr
+    sr_enc, sr_dec = model.feature_extractor.sampling_rate
+    return model, processor, sr_enc, sr_dec
 
-def load_wavtokenizer_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int]:
+def load_wavtokenizer_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int, int]:
     # add `WavTokenizer` directory to the import path.
     # TODO: get rid of this if a proper WavTokenizer package is ever released.
     if not os.path.exists("WavTokenizer"):
@@ -177,10 +180,10 @@ def load_wavtokenizer_model(codec_model: str, device: Union[str, torch.device]) 
     model_ckpt = hf_hub_download(**model_info["ckpt"])
     model = WavTokenizer.from_pretrained0802(config_file, model_ckpt).to(device)
     processor = DefaultProcessor()
-    sr = model.feature_extractor.encodec.sample_rate
-    return model, processor, sr
+    sr_enc, sr_dec = model.feature_extractor.encodec.sample_rate
+    return model, processor, sr_enc, sr_dec
 
-def load_simvq_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int]:
+def load_simvq_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int, int]:
     # add `SimVQ` directory to the import path.
     # TODO: get rid of this if a proper SimVQ package is ever released.
     if not os.path.exists("SimVQ"):
@@ -205,10 +208,10 @@ def load_simvq_model(codec_model: str, device: Union[str, torch.device]) -> Tupl
     model.load_state_dict(sd, strict=False)
     model = model.eval().to(device)
     processor = DefaultProcessor()
-    sr = config.model.init_args.sample_rate
-    return model, processor, sr
+    sr_enc, sr_dec = config.model.init_args.sample_rate
+    return model, processor, sr_enc, sr_dec
 
-def load_magicodec_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int]:
+def load_magicodec_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int, int]:
     # add `MagiCodec` directory to the import path.
     # TODO: get rid of this if a proper MagiCodec package is ever released.
     if not os.path.exists("MagiCodec"):
@@ -229,21 +232,34 @@ def load_magicodec_model(codec_model: str, device: Union[str, torch.device]) -> 
     model.load_state_dict(state_dict, strict=False)
     model = model.eval().to(device)
     processor = DefaultProcessor()
-    sr = model.sample_rate
-    return model, processor, sr
+    sr_enc, sr_dec = model.sample_rate
+    return model, processor, sr_enc, sr_dec
 
-def load_transformers_codec_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, FeatureExtractionMixin, int]:
+def load_neucodec_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int, int]:
+    if "distill" in codec_model.lower():
+        from neucodec import DistillNeuCodec
+        model = DistillNeuCodec.from_pretrained(codec_model)
+    else:
+        from neucodec import NeuCodec
+        model = NeuCodec.from_pretrained(codec_model)
+    model = model.eval().to(device)
+    processor = DefaultProcessor()
+    sr_enc = model.feature_extractor.sampling_rate
+    sr_dec = model.sample_rate
+    return model, processor, sr_enc, sr_dec
+
+def load_transformers_codec_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, FeatureExtractionMixin, int, int]:
     from transformers import AutoModel, AutoProcessor
     model = AutoModel.from_pretrained(codec_model).to(device)
     processor = AutoProcessor.from_pretrained(codec_model)
-    sr = model.config.sampling_rate
-    return model, processor, sr
+    sr_enc, sr_dec = model.config.sampling_rate
+    return model, processor, sr_enc, sr_dec
 
 def load_codec_model(
     codec_type: CodecTypes, 
     codec_model: str,
     device: Union[str, torch.device],
-) -> Tuple[torch.nn.Module, Union[DefaultProcessor, FeatureExtractionMixin], int]:
+) -> Tuple[torch.nn.Module, Union[DefaultProcessor, FeatureExtractionMixin], int, int]:
     if codec_type == CodecTypes.FUNCODEC:
         return load_funcodec_model(codec_model, device)
     elif codec_type == CodecTypes.XCODEC2:
@@ -254,5 +270,7 @@ def load_codec_model(
         return load_simvq_model(codec_model, device)
     elif codec_type == CodecTypes.MAGICODEC:
         return load_magicodec_model(codec_model, device)
+    elif codec_type == CodecTypes.NEUCODEC:
+        return load_neucodec_model(codec_model, device)
     else:
         return load_transformers_codec_model(codec_model, device)

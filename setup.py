@@ -38,5 +38,6 @@ setup(
         "wavtokenizer": read_requirements("requirements_wavtokenizer.txt"),
         "simvq": read_requirements("requirements_simvq.txt"),
         "magicodec": read_requirements("requirements_magicodec.txt"),
+        "neucodec": read_requirements("requirements_neucodec.txt"),
     },
 )

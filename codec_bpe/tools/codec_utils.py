@@ -141,7 +141,7 @@ def load_funcodec_model(codec_model: str, device: Union[str, torch.device]) -> T
     model = Speech2Token(config_file, model_pth, device=str(device))
     model.eval()
     processor = DefaultProcessor()
-    sr_enc, sr_dec = model.model_args.sampling_rate
+    sr_enc = sr_dec = model.model_args.sampling_rate
     return model, processor, sr_enc, sr_dec
 
 def load_xcodec2_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int, int]:
@@ -158,7 +158,7 @@ def load_xcodec2_model(codec_model: str, device: Union[str, torch.device]) -> Tu
     model = XCodec2Model.from_pretrained(None, config=codec_config, state_dict=ckpt)
     model = model.eval().to(device)
     processor = DefaultProcessor()
-    sr_enc, sr_dec = model.feature_extractor.sampling_rate
+    sr_enc = sr_dec = model.feature_extractor.sampling_rate
     return model, processor, sr_enc, sr_dec
 
 def load_wavtokenizer_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int, int]:
@@ -180,7 +180,7 @@ def load_wavtokenizer_model(codec_model: str, device: Union[str, torch.device]) 
     model_ckpt = hf_hub_download(**model_info["ckpt"])
     model = WavTokenizer.from_pretrained0802(config_file, model_ckpt).to(device)
     processor = DefaultProcessor()
-    sr_enc, sr_dec = model.feature_extractor.encodec.sample_rate
+    sr_enc = sr_dec = model.feature_extractor.encodec.sample_rate
     return model, processor, sr_enc, sr_dec
 
 def load_simvq_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int, int]:
@@ -208,7 +208,7 @@ def load_simvq_model(codec_model: str, device: Union[str, torch.device]) -> Tupl
     model.load_state_dict(sd, strict=False)
     model = model.eval().to(device)
     processor = DefaultProcessor()
-    sr_enc, sr_dec = config.model.init_args.sample_rate
+    sr_enc = sr_dec = config.model.init_args.sample_rate
     return model, processor, sr_enc, sr_dec
 
 def load_magicodec_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int, int]:
@@ -232,7 +232,7 @@ def load_magicodec_model(codec_model: str, device: Union[str, torch.device]) -> 
     model.load_state_dict(state_dict, strict=False)
     model = model.eval().to(device)
     processor = DefaultProcessor()
-    sr_enc, sr_dec = model.sample_rate
+    sr_enc = sr_dec = model.sample_rate
     return model, processor, sr_enc, sr_dec
 
 def load_neucodec_model(codec_model: str, device: Union[str, torch.device]) -> Tuple[torch.nn.Module, DefaultProcessor, int, int]:
@@ -252,7 +252,7 @@ def load_transformers_codec_model(codec_model: str, device: Union[str, torch.dev
     from transformers import AutoModel, AutoProcessor
     model = AutoModel.from_pretrained(codec_model).to(device)
     processor = AutoProcessor.from_pretrained(codec_model)
-    sr_enc, sr_dec = model.config.sampling_rate
+    sr_enc = sr_dec = model.config.sampling_rate
     return model, processor, sr_enc, sr_dec
 
 def load_codec_model(
